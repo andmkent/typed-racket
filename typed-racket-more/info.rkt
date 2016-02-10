@@ -13,8 +13,7 @@
                "gui-lib"
                "pict-lib"
                "racket-index"
-               "sandbox-lib"
-               "racket/unsafe/ops"))
+               "sandbox-lib"))
 
 (define pkg-desc "Types for various libraries")
 
