@@ -8,6 +8,7 @@
                "unstable-list-lib"
                "source-syntax"
                "rackunit-lib"
+               "git://github.com/andmkent/typed-racket?path=typed-racket-more#rtr-prototype"
                "compatibility-lib" ;; to assign types
                "string-constants-lib"))
 
