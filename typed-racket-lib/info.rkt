@@ -7,6 +7,7 @@
                "unstable-contract-lib"
                "unstable-list-lib"
                "source-syntax"
+               "rackunit-lib"
                "compatibility-lib" ;; to assign types
                "string-constants-lib"))
 
