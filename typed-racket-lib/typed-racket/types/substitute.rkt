@@ -6,7 +6,7 @@
          (contract-req)
          (only-in (types base-abbrev) -Tuple* -lst -Null -result ManyUniv)
          (rep type-rep values-rep rep-utils)
-         (utils tc-utils)
+         (utils tc-utils performance)
          (rep rep-utils free-variance)
          (env tvar-env))
 (lazy-require ("union.rkt" (Un)))
@@ -40,45 +40,47 @@
 ;; substitute-many : Hash[Name,Type] Type -> Type
 (define/cond-contract (substitute-many subst target)
   (simple-substitution/c Rep? . -> .  Rep?)
-  (define names (hash-keys subst))
-  (let sub ([target target])
-    (match target
-      [(F: name) (hash-ref subst name target)]
-      [(arr: dom rng rest drest kws)
-       (cond
-         [(and (pair? drest)
-               (ormap (λ (name) (and (equal? name (cdr drest))
-                                     (not (bound-tvar? name))
-                                     name))
-                      names))
-          =>
-          (λ (name)
-            (int-err "substitute used on ... variable ~a in type ~a" name target))]
-         [else
-          (make-arr (map sub dom)
-                    (sub rng)
-                    (and rest (sub rest))
-                    (and drest (cons (sub (car drest)) (cdr drest)))
-                    (map sub kws))])]
-      [(ValuesDots: types dty dbound)
-       (cond
-         [(for/or ([name (in-list names)])
-            (and (equal? dbound name)
-                 (not (bound-tvar? name))))
-          =>
-          (λ (name)
-            (int-err "substitute used on ... variable ~a in type ~a" name target))]
-         [else (make-ValuesDots (map sub types) (sub dty) dbound)])]
-      [(ListDots: dty dbound)
-       (cond
-         [(for/or ([name (in-list names)])
-            (and (equal? dbound name)
-                 (not (bound-tvar? name))))
-          =>
-          (λ (name)
-            (int-err "substitute used on ... variable ~a in type ~a" name target))]
-         [else (make-ListDots (sub dty) dbound)])]
-      [_ (Rep-fold sub target)])))
+  (performance-region
+   ['subst 'substitute-many]
+   (define names (hash-keys subst))
+   (let sub ([target target])
+     (match target
+       [(F: name) (hash-ref subst name target)]
+       [(arr: dom rng rest drest kws)
+        (cond
+          [(and (pair? drest)
+                (ormap (λ (name) (and (equal? name (cdr drest))
+                                      (not (bound-tvar? name))
+                                      name))
+                       names))
+           =>
+           (λ (name)
+             (int-err "substitute used on ... variable ~a in type ~a" name target))]
+          [else
+           (make-arr (map sub dom)
+                     (sub rng)
+                     (and rest (sub rest))
+                     (and drest (cons (sub (car drest)) (cdr drest)))
+                     (map sub kws))])]
+       [(ValuesDots: types dty dbound)
+        (cond
+          [(for/or ([name (in-list names)])
+             (and (equal? dbound name)
+                  (not (bound-tvar? name))))
+           =>
+           (λ (name)
+             (int-err "substitute used on ... variable ~a in type ~a" name target))]
+          [else (make-ValuesDots (map sub types) (sub dty) dbound)])]
+       [(ListDots: dty dbound)
+        (cond
+          [(for/or ([name (in-list names)])
+             (and (equal? dbound name)
+                  (not (bound-tvar? name))))
+           =>
+           (λ (name)
+             (int-err "substitute used on ... variable ~a in type ~a" name target))]
+          [else (make-ListDots (sub dty) dbound)])]
+       [_ (Rep-fold sub target)]))))
 
 
 
@@ -93,7 +95,9 @@
 ;; substitute-dots : Listof[Type] Option[type] Name Type -> Type
 (define/cond-contract (substitute-dots images rimage name target)
   ((listof Rep?) (or/c #f Rep?) symbol? Rep?  . -> . Rep?)
-  (let sub ([target target])
+  (performance-region
+   ['subst 'substitute-dots]
+   (let sub ([target target])
     (match target
       [(ListDots: dty dbound)
        (if (eq? name dbound)
@@ -137,13 +141,15 @@
                     (and rest (sub rest))
                     (and drest (cons (sub (car drest)) (cdr drest)))
                     (map sub kws))])]
-      [_ (Rep-fold sub target)])))
+      [_ (Rep-fold sub target)]))))
 
 ;; implements curly brace substitution from the formalism, with the addition
 ;; that a substitution can include fixed args in addition to a different dotted arg
 ;; substitute-dotted : Listof[Type] Type Name Name Type -> Type
 (define (substitute-dotted pre-image image image-bound name target)
-  (let sub ([target target])
+  (performance-region
+   ['subst 'substitute-dotted]
+   (let sub ([target target])
     (match target
       [(ValuesDots: types dty dbound)
        (let ([extra-types (cond
@@ -177,27 +183,28 @@
                                  image-bound]
                                 [else (cdr drest)])))
                    (map sub kws)))]
-      [_ (Rep-fold sub target)])))
+      [_ (Rep-fold sub target)]))))
 
 ;; substitute many variables
 ;; subst-all : substitution/c Type -> Type
 (define/cond-contract (subst-all s ty)
   (substitution/c Rep? . -> . Rep?)
+  (performance-region
+   ['subst]
+   (define t-substs
+     (for/fold ([acc (hash)]) ([(v r) (in-hash s)])
+       (match r
+         [(t-subst img)
+          (hash-set acc v img)]
+         [_ acc])))
+   (define t-substed-ty (substitute-many t-substs ty))
 
-  (define t-substs
-    (for/fold ([acc (hash)]) ([(v r) (in-hash s)])
-      (match r
-        [(t-subst img)
-         (hash-set acc v img)]
-        [_ acc])))
-  (define t-substed-ty (substitute-many t-substs ty))
-
-  (for/fold ([t t-substed-ty]) ([(v r) (in-hash s)])
-    (match r
-      [(t-subst img) t]
-      [(i-subst imgs)
-       (substitute-dots imgs #f v t)]
-      [(i-subst/starred imgs rest)
-       (substitute-dots imgs rest v t)]
-      [(i-subst/dotted imgs dty dbound)
-       (substitute-dotted imgs dty dbound v t)])))
+   (for/fold ([t t-substed-ty]) ([(v r) (in-hash s)])
+     (match r
+       [(t-subst img) t]
+       [(i-subst imgs)
+        (substitute-dots imgs #f v t)]
+       [(i-subst/starred imgs rest)
+        (substitute-dots imgs rest v t)]
+       [(i-subst/dotted imgs dty dbound)
+        (substitute-dotted imgs dty dbound v t)]))))

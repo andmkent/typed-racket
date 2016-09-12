@@ -6,7 +6,7 @@
          (rep type-rep prop-rep object-rep
               core-rep type-mask values-rep rep-utils
               free-variance)
-         (utils tc-utils early-return)
+         (utils tc-utils early-return performance)
          (types utils resolve match-expanders current-seen
                 numeric-tower substitute prefab signatures)
          (for-syntax racket/base syntax/parse racket/sequence)
@@ -36,8 +36,9 @@
 ;; is s a subtype of t?
 ;; type type -> boolean
 (define (subtype t1 t2)
-  (define res (and (subtype* (seen) t1 t2) #t))
-  res)
+  (performance-region
+   ['subtype]
+   (and (subtype* (seen) t1 t2) #t)))
 
 (define (subval t1 t2)
   (and (subval* (seen) t1 t2) #t))

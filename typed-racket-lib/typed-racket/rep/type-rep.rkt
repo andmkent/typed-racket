@@ -6,7 +6,7 @@
 (require "../utils/utils.rkt")
 
 ;; TODO use contract-req
-(require (utils tc-utils)
+(require (utils tc-utils performance)
          "rep-utils.rkt"
          "core-rep.rkt"
          "values-rep.rkt"
@@ -900,7 +900,8 @@
     (cond [(assq name* mapping)
            => (λ (pr) (fn (+ (cdr pr) lvl)))]
           [else default]))
-  (type-binder-transform transform ty #t))
+  (performance-region ['abstract-many]
+   (type-binder-transform transform ty #t)))
 
 
 (define/cond-contract (instantiate-many images ty)
@@ -917,7 +918,9 @@
     (cond [(assf (λ (v) (eqv? (+ v lvl) n)) mapping)
            => (λ (pr) (fn (cdr pr)))]
           [else default]))
-  (type-binder-transform transform ty #f))
+  (performance-region
+   ['instantiate-many]
+   (type-binder-transform transform ty #f)))
 
 (define (abstract name ty)
   (abstract-many (list name) ty))

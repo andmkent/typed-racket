@@ -1,6 +1,7 @@
 #lang racket/base
 
 (require "../utils/utils.rkt"
+         (utils performance)
          racket/match racket/list
          (except-in (types abbrev union utils prop-ops tc-result)
                     -> ->* one-of/c)
@@ -66,39 +67,41 @@
                   . -> .
                   (values (or/c #f (listof OrProp?))
                           (or/c #f (listof (or/c TypeProp? NotTypeProp?)))))
-  (define (atomic-prop? p) (or (TypeProp? p) (NotTypeProp? p)))
-  (define-values (new-atoms new-formulas) (partition atomic-prop? (flatten-props new-props)))
-  (let loop ([derived-ors null]
-             [derived-atoms new-atoms]
-             [worklist (append old-props new-formulas)])
-    (match worklist
-      [(cons (app (λ (p) (resolve derived-atoms p)) p)
-             worklist)
-       (match p
-         [(OrProp: qs)
-          (let or-loop ([qs qs] [result null])
-            (match qs
-              [(cons q qs)
-               (let check-loop ([atoms derived-atoms])
-                 (match atoms
-                   [(cons a atoms)
-                    (cond
-                      [(contradictory? q a) (or-loop qs result)]
-                      [(implies-atomic? a q) (loop derived-ors derived-atoms worklist)]
-                      [else (check-loop atoms)])]
-                   [_ (or-loop qs (cons q result))]))]
-              [_ (define new-or (apply -or result))
-                 (if (OrProp? new-or)
-                     (loop (cons new-or derived-ors) derived-atoms worklist)
-                     (loop derived-ors derived-atoms (cons new-or worklist)))]))]
-         [(or (? TypeProp?)
-              (? NotTypeProp?))
-          (loop derived-ors (cons p derived-atoms) worklist)]
+  (performance-region
+   ['logic 'combine-props]
+   (define (atomic-prop? p) (or (TypeProp? p) (NotTypeProp? p)))
+   (define-values (new-atoms new-formulas) (partition atomic-prop? (flatten-props new-props)))
+   (let loop ([derived-ors null]
+              [derived-atoms new-atoms]
+              [worklist (append old-props new-formulas)])
+     (match worklist
+       [(cons (app (λ (p) (resolve derived-atoms p)) p)
+              worklist)
+        (match p
+          [(OrProp: qs)
+           (let or-loop ([qs qs] [result null])
+             (match qs
+               [(cons q qs)
+                (let check-loop ([atoms derived-atoms])
+                  (match atoms
+                    [(cons a atoms)
+                     (cond
+                       [(contradictory? q a) (or-loop qs result)]
+                       [(implies-atomic? a q) (loop derived-ors derived-atoms worklist)]
+                       [else (check-loop atoms)])]
+                    [_ (or-loop qs (cons q result))]))]
+               [_ (define new-or (apply -or result))
+                  (if (OrProp? new-or)
+                      (loop (cons new-or derived-ors) derived-atoms worklist)
+                      (loop derived-ors derived-atoms (cons new-or worklist)))]))]
+          [(or (? TypeProp?)
+               (? NotTypeProp?))
+           (loop derived-ors (cons p derived-atoms) worklist)]
 
-         [(AndProp: qs) (loop derived-ors derived-atoms (append qs worklist))]
-         [(== -tt prop-equal?) (loop derived-ors derived-atoms worklist)]
-         [(== -ff prop-equal?) (values #f #f)])]
-      [_ (values derived-ors derived-atoms)])))
+          [(AndProp: qs) (loop derived-ors derived-atoms (append qs worklist))]
+          [(== -tt prop-equal?) (loop derived-ors derived-atoms worklist)]
+          [(== -ff prop-equal?) (values #f #f)])]
+       [_ (values derived-ors derived-atoms)]))))
 
 
 (define (unconditional-prop res)

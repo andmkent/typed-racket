@@ -1,6 +1,7 @@
 #lang racket/base
 
 (require "../utils/utils.rkt"
+         (utils performance)
          (rep type-rep rep-utils type-mask)
          (prefix-in c: (contract-req))
          (types abbrev subtype resolve utils)
@@ -39,12 +40,14 @@
 ;; have a non-empty intersection
 (define/cond-contract (overlap? t1 t2)
   (c:-> Type? Type? boolean?)
-  (cond
-    [(type-equal? t1 t2) #t]
-    [(disjoint-masks? (Type-mask t1) (Type-mask t2)) #f]
-    [(seen? t1 t2) #t]
-    [else
-     (with-updated-seen
+  (performance-region
+   ['overlap]
+   (cond
+     [(type-equal? t1 t2) #t]
+     [(disjoint-masks? (Type-mask t1) (Type-mask t2)) #f]
+     [(seen? t1 t2) #t]
+     [else
+      (with-updated-seen
        t1 t2
        (match*/no-order
         (t1 t2)
@@ -125,7 +128,7 @@
           (and t2 (Struct: _ _ _ _ _ _)))
          (or (subtype t1 t2) (subtype t2 t1)
              (parent-of? t1 t2) (parent-of? t2 t1))]
-        [(_ _) #t]))]))
+        [(_ _) #t]))])))
 
 
 ;; Type Type -> Boolean

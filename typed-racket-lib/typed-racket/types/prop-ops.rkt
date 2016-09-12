@@ -1,6 +1,7 @@
 #lang racket/base
 
 (require "../utils/utils.rkt"
+         (utils performance)
          racket/list racket/match
          (prefix-in c: (contract-req))
          (rep type-rep prop-rep object-rep values-rep rep-utils)
@@ -189,74 +190,78 @@
     [(OrProp: ps) (apply -and (map negate-prop ps))]))
 
 (define (-or . args)
-  (define (distribute args)
-    (define-values (ands others) (partition AndProp? args))
-    (match ands
-      [(cons (AndProp: elems) ands)
-       (apply -and (for/list ([elem (in-list elems)])
-                     (apply -or elem (append ands others))))]
-      [_ (make-OrProp others)]))
-  (let loop ([ps args] [result null])
-    (match ps
-      [(cons p ps)
-       (match p
-         [(OrProp: ps*) (loop (append ps* ps) result)]
-         [(? FalseProp?) (loop ps result)]
-         [_
-          (let check-loop ([qs ps])
-            (match qs
-              [(cons q qs) (cond
-                             [(complementary? p q) -tt]
-                             [(implies-atomic? p q) (loop ps result)]
-                             [else (check-loop qs)])]
-              [_ #:when (for/or ([q (in-list result)])
-                          (implies-atomic? p q))
-                 (loop ps result)]
-              [_ (loop ps (cons p result))]))])]
-      [_ (distribute (compact-or-props result))])))
+  (performance-region
+   ['logic '-or]
+   (define (distribute args)
+     (define-values (ands others) (partition AndProp? args))
+     (match ands
+       [(cons (AndProp: elems) ands)
+        (apply -and (for/list ([elem (in-list elems)])
+                      (apply -or elem (append ands others))))]
+       [_ (make-OrProp others)]))
+   (let loop ([ps args] [result null])
+     (match ps
+       [(cons p ps)
+        (match p
+          [(OrProp: ps*) (loop (append ps* ps) result)]
+          [(? FalseProp?) (loop ps result)]
+          [_
+           (let check-loop ([qs ps])
+             (match qs
+               [(cons q qs) (cond
+                              [(complementary? p q) -tt]
+                              [(implies-atomic? p q) (loop ps result)]
+                              [else (check-loop qs)])]
+               [_ #:when (for/or ([q (in-list result)])
+                           (implies-atomic? p q))
+                  (loop ps result)]
+               [_ (loop ps (cons p result))]))])]
+       [_ (distribute (compact-or-props result))]))))
 
 (define (-and . args)
-  (define-values (pos neg others)
-    (let loop ([args args]
-               [pos '()]
-               [neg '()]
-               [others '()])
-      (match args
-        [(cons arg args)
-         (match arg
-           [(TypeProp: o t) (loop args (intersect-update pos o t) neg others)]
-           [(NotTypeProp: o t) (loop args pos (union-update neg o t) others)]
-           [(AndProp: ps)
-            (let-values ([(pos neg others) (loop ps pos neg others)])
-              (loop args pos neg others))]
-           [_ (loop args pos neg (cons arg others))])]
-        [_ (values pos neg others)])))
-  ;; Move all the type props up front as they are the stronger props
-  (let loop ([ps (append (for*/list ([p (in-mlist pos)]
-                                     [p (in-value (-is-type (mcar p) (mcdr p)))]
-                                     #:when (not (prop-equal? -tt p)))
-                           p)
-                         (for*/list ([p (in-mlist neg)]
-                                     [p (in-value (-not-type (mcar p) (mcdr p)))]
-                                     #:when (not (prop-equal? -tt p)))
-                           p)
-                         others)]
-             [result null])
-    (match ps
-      [(cons p ps)
-       (cond
-         [(let check-loop ([qs ps])
-            (match qs
-              [(cons q qs) (cond
-                             [(contradictory? p q) -ff]
-                             [(implies-atomic? q p) (loop ps result)]
-                             [else (check-loop qs)])]
-              [_ #f]))]
-         [(for/or ([q (in-list result)])
-            (implies-atomic? q p))
-          (loop ps result)]
-         [else (loop ps (cons p result))])]
-      [_ (make-AndProp result)])))
+  (performance-region
+   ['logic '-and]
+   (define-values (pos neg others)
+     (let loop ([args args]
+                [pos '()]
+                [neg '()]
+                [others '()])
+       (match args
+         [(cons arg args)
+          (match arg
+            [(TypeProp: o t) (loop args (intersect-update pos o t) neg others)]
+            [(NotTypeProp: o t) (loop args pos (union-update neg o t) others)]
+            [(AndProp: ps)
+             (let-values ([(pos neg others) (loop ps pos neg others)])
+               (loop args pos neg others))]
+            [_ (loop args pos neg (cons arg others))])]
+         [_ (values pos neg others)])))
+   ;; Move all the type props up front as they are the stronger props
+   (let loop ([ps (append (for*/list ([p (in-mlist pos)]
+                                      [p (in-value (-is-type (mcar p) (mcdr p)))]
+                                      #:when (not (prop-equal? -tt p)))
+                            p)
+                          (for*/list ([p (in-mlist neg)]
+                                      [p (in-value (-not-type (mcar p) (mcdr p)))]
+                                      #:when (not (prop-equal? -tt p)))
+                            p)
+                          others)]
+              [result null])
+     (match ps
+       [(cons p ps)
+        (cond
+          [(let check-loop ([qs ps])
+             (match qs
+               [(cons q qs) (cond
+                              [(contradictory? p q) -ff]
+                              [(implies-atomic? q p) (loop ps result)]
+                              [else (check-loop qs)])]
+               [_ #f]))]
+          [(for/or ([q (in-list result)])
+             (implies-atomic? q p))
+           (loop ps result)]
+          [else (loop ps (cons p result))])]
+       [_ (make-AndProp result)]))))
 
 ;; add-unconditional-prop: tc-results? Prop? -> tc-results?
 ;; Ands the given proposition to the props in the tc-results.
