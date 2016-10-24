@@ -82,11 +82,18 @@
     (unless (syntax? form)
       (int-err "bad form input to tc-expr: ~a" form))
     (define result
-      ;; if there is an annotation, use that expected type for internal checking
+      ;; if there is a type annotation of any kind?
       (syntax-parse form
+        ;; an 'unsafe-assume' -- do not check the body, just use the type
+        [exp:type-assumption^
+         (register-ignored! #'exp)
+         (add-scoped-tvars #'exp (parse-literal-alls (attribute exp.value)))
+         (fix-results (parse-tc-results (attribute exp.value)))]
+        ;; a standard 'ann' annotation --- check the body and use that exact return type
         [exp:type-ascription^
          (add-scoped-tvars #'exp (parse-literal-alls (attribute exp.value)))
          (tc-expr/check/internal #'exp (parse-tc-results (attribute exp.value)))]
+        ;; no type annotation, check per the usual
         [_ (reduce-tc-results/subsumption
             (tc-expr/check/internal form expected))]))
     (add-typeof-expr form result)

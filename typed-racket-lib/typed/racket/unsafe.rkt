@@ -3,7 +3,8 @@
 ;; This module provides unsafe operations for Typed Racket
 
 (provide (protect-out unsafe-provide
-                      unsafe-require/typed))
+                      unsafe-require/typed
+                      unsafe-assume))
 
 (require (for-syntax racket/base
                      typed-racket/private/syntax-properties
@@ -17,3 +18,11 @@
     [(_ . rst)
      (quasisyntax/loc stx
        #,(unsafe-provide #'(provide . rst)))]))
+
+(define-syntax (unsafe-assume stx)
+  (syntax-case stx ()
+    [(_ arg ty) (type-assumption-property (syntax/loc stx (#%expression arg))
+                                          (syntax/loc stx ty))]
+    [(_ arg : ty) (eq? (syntax-e #':) ':)
+                  (type-assumption-property (syntax/loc stx (#%expression arg))
+                                            (syntax/loc stx ty))]))

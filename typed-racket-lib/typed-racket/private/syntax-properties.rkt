@@ -56,6 +56,7 @@
   (casted-expr typechecker:casted-expr) ; Type -> Void, takes the original type of the casted expr
   (with-type typechecker:with-type #:mark)
   (type-ascription type-ascription)
+  (type-assumption type-assumption)
   (type-inst type-inst)
   (row-inst row-inst)
   (type-label type-label)
