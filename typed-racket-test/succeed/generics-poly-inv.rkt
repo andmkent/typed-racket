@@ -2,17 +2,33 @@
 
 (require racket/generic)
 
-(define-generics indexable
-  [(nth indexable i) : (-> indexable Integer Any)])
+(define-generics (indexable [A #:invariant])
+  [(nth indexable i) : (-> (indexable A) Integer A)])
 
-(struct Tuple ([l : Any] [r : Any]) #:transparent
-  #:methods [gen:indexable : indexable]
-  [(define (nth p i)
-     (cond
-       [(= i 0) (Tuple-l p)]
-       [(= i 1) (Tuple-r p)]
-       [else (error 'nth "invalid index: ~a" i)]))])
+(struct Seq (A) ([l : (Listof A)]) #:transparent
+  #:methods [gen:indexable : (indexable A)]
+  [(define (nth s i)
+     (list-ref (Seq-l s) i))])
 
-(define t (Tuple "zero" "one"))
+(struct MutableSeq (A) ([l : (Listof A) #:mutable]) #:transparent
+  #:methods [gen:indexable : (indexable A)]
+  [(define (nth s i)
+     (list-ref (Seq-l s) i))])
 
-(ann (nth t 0) Any)
+;; Immutable Struct tests
+
+(define s1 : (Seq Natural) (Seq (list 1 2 3)))
+
+(ann s1 (Seq Natural))
+((inst nth Natural) s1 0)
+(nth s1 0)
+
+
+;; Mutable Struct tests
+
+(define s2 : (MutableSeq Natural) (Sack (list 4 5 6)))
+
+(ann s2 (MutableSeq Natural))
+((inst nth Natural) s2 0)
+(nth s2 0)
+
