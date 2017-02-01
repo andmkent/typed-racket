@@ -1,7 +1,7 @@
 #lang racket/base
 
 (require "../utils/utils.rkt"
-         (rep type-rep)
+         (rep type-rep var)
          (utils tc-utils)
          (env global-env mvar-env)
          (except-in (types subtype abbrev utils generalize)
@@ -101,7 +101,7 @@
                                [a (in-list anns)] [f (in-list fs)] [o (in-list os)])
                       (cond [a (check-type stx ty a) (tc-result a f o)]
                             ;; mutated variables get generalized, so that we don't infer too small a type
-                            [(is-var-mutated? stx) (tc-result (generalize ty) f o)]
+                            [(is-var-mutated? (var stx)) (tc-result (generalize ty) f o)]
                             [else (tc-result ty f o)])))]))))]))
 
 ;; check that e-type is compatible with ty in context of stx

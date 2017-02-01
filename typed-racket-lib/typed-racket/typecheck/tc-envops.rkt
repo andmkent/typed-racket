@@ -4,7 +4,7 @@
          racket/match racket/list
          (for-syntax racket/base syntax/parse)
          (contract-req)
-         (rep type-rep prop-rep object-rep rep-utils)
+         (rep type-rep prop-rep object-rep rep-utils var)
          (utils tc-utils)
          racket/set
          (types tc-result resolve subtype update prop-ops)
@@ -36,23 +36,25 @@
             [(cons p ps)
              (match p
                [(TypeProp: (Path: lo x) pt)
-                #:when (and (not (is-var-mutated? x))
-                            (identifier-binding x))
-                (let* ([t (lookup-type/lexical x Γ #:fail (λ (_) Univ))]
+                #:when (and (var-id x)
+                            (not (is-var-mutated? x))
+                            (identifier-binding (var-id x)))
+                (let* ([t (lookup-var-type x Γ #:failure Univ)]
                        [new-t (update t pt #t lo)])
                   (and (not (Bottom? new-t))
                        (loop ps negs (env-set-type Γ x new-t))))]
                ;; process negative info _after_ positive info so we don't miss anything
                [(NotTypeProp: (Path: _ x) _)
-                #:when (and (not (is-var-mutated? x))
-                            (identifier-binding x))
+                #:when (and (var-id x)
+                            (not (is-var-mutated? x))
+                            (identifier-binding (var-id x)))
                 (loop ps (cons p negs) Γ)]
                [_ (loop ps negs Γ)])]
             [_ (let ([Γ (let loop ([negs negs]
                                    [Γ Γ])
                           (match negs
                             [(cons (NotTypeProp: (Path: lo x) pt) rst)
-                             (let* ([t (lookup-type/lexical x Γ #:fail (λ (_) Univ))]
+                             (let* ([t (lookup-var-type x Γ #:failure Univ)]
                                     [new-t (update t pt #f lo)])
                                (and (not (Bottom? new-t))
                                     (loop rst (env-set-type Γ x new-t))))]

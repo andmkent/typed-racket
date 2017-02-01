@@ -4,7 +4,7 @@
          racket/syntax syntax/parse syntax/stx syntax/id-table
          racket/list racket/match racket/sequence
          (prefix-in c: (contract-req))
-         (rep core-rep type-rep values-rep)
+         (rep core-rep type-rep values-rep var)
          (types utils abbrev type-table struct-table resolve)
          (private parse-type type-annotation syntax-properties type-contract)
          (env global-env init-envs type-name-env type-alias-env
@@ -80,7 +80,7 @@
       ;; declare-refinement
       ;; FIXME - this sucks and should die
       [t:type-refinement
-       (match (lookup-type/lexical #'t.predicate)
+       (match (lookup-var-type (var #'t.predicate))
               [(and t (Function: (list (arr: (list dom) (Values: (list (Result: rng _ _))) #f #f '()))))
                (let ([new-t (make-pred-ty (list dom)
                                           rng
@@ -97,7 +97,7 @@
 
       [r:typed-require/struct
        (let* ([t (parse-type #'r.type)]
-              [struct-type (lookup-type-name (Name-id t))]
+              [struct-type (lookup-type-name (Name-var t))]
               [mk-ty (match struct-type
                        [(Poly-names: ns body)
                         (make-Poly ns
@@ -243,7 +243,7 @@
              [import-ids (in-list (syntax->list #'(dviu.import.members ...)))])
          (for ([member (in-list (syntax->list  import-ids))]
                [expected-type (in-list (map cdr (signature->bindings import-sig)))])
-           (define lexical-type (lookup-type/lexical member))
+           (define lexical-type (lookup-var-type (var member)))
            (check-below lexical-type expected-type)))
        (register-ignored! #'dviu)
        'no-type]
@@ -347,14 +347,14 @@
     (get-type-alias-info type-aliases))
 
   ;; Add the struct names to the type table, but not with a type
-  (let ((names (map name-of-struct struct-defs))
-        (type-vars (map type-vars-of-struct struct-defs)))
-    (for ([name (in-list names)]
-          [tvars (in-list type-vars)])
-      (register-resolved-type-alias
-       name (make-Name name (length tvars) #t)))
-    (for-each register-type-name names)
-    (for-each add-constant-variance! names type-vars))
+  (for* ([def (in-list struct-defs)]
+         [name (in-value (var (name-of-struct def)))]
+         [tvars (in-value (map var (type-vars-of-struct def)))])
+    (register-resolved-type-alias
+     name
+     (make-Name name (length tvars) #t))
+    (register-type-name name)
+    (add-constant-variance! name tvars))
   (do-time "after adding type names")
 
   (register-all-type-aliases type-alias-names type-alias-map)

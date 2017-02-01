@@ -3,55 +3,66 @@
 ;; Top-level type environment
 ;; maps identifiers to their types, updated by mutation
 
-(require "../types/tc-error.rkt"
-         "../utils/tc-utils.rkt"
-         "env-utils.rkt"
+(require "../utils/utils.rkt"
+         (contract-req)
+         (utils tc-utils)
+         (types tc-error)
+         (rep core-rep var)
+         racket/match
          syntax/parse
-         syntax/id-table
-         racket/lazy-require) 
-(provide register-type register-type-if-undefined
-         finish-register-type
-         maybe-finish-register-type
-         register-type/undefined
-         lookup-type
-         typed-id^
-         register-types
-         unregister-type
-         check-all-registered-types
-         type-env-map
-         type-env-for-each)
+         racket/lazy-require
+         data/ddict)
+
+(provide typed-id^)
+
+(provide/cond-contract
+ [register-type (-> var? (or/c Type? (-> Type?)) void?)]
+ [register-type-if-undefined (-> var? (or/c Type? (-> Type?)) void?)]
+ [finish-register-type (->* (var?) (boolean?) void?)]
+ [maybe-finish-register-type (-> var? (or/c void? #f))]
+ [register-type/undefined (-> var? Type? void?)]
+ [lookup-type (-> var? any/c any)]
+ [register-types (-> (listof var?) (listof (or/c Type? (-> Type?))) void?)]
+ [unregister-type (-> var? void?)]
+ [check-all-registered-types (-> void?)]
+ [type-env-map (-> procedure? list?)]
+ [type-env-for-each (-> procedure? void?)])
 
 ;; free-id-table from id -> type or Box[type]
 ;; where id is a variable, and type is the type of the variable
 ;; if the result is a box, then the type has not actually been defined, just registered
-(define the-mapping (make-free-id-table))
+(define the-mapping (mutable-ddict))
 
 ;; add a single type to the mapping
 ;; identifier type -> void
 (define (register-type id type)
-  (free-id-table-set! the-mapping id type))
+  (ddict-set! the-mapping id type))
 
-(define (register-type-if-undefined id type)
-  (cond [(free-id-table-ref the-mapping id (lambda _ #f))
-         => (lambda (e)
-              (define t (if (box? e) (unbox e) e))
-              (unless (equal? t type)
-                (tc-error/delayed #:stx id "Duplicate type annotation of ~a for ~a, previous was ~a" type (syntax-e id) t))
-              (when (box? e)
-                (free-id-table-set! the-mapping id t)))]
-        [else (register-type id type)]))
+(define (register-type-if-undefined var type)
+  (match (ddict-ref the-mapping var #f)
+    [#f (register-type var type)]
+    [e (define t (if (box? e) (unbox e) e))
+       (unless (equal? t type)
+         (tc-error/delayed #:stx (var-id var)
+                           "Duplicate type annotation of ~a for ~a, previous was ~a"
+                           type
+                           (syntax-e (var-id var))
+                           t))
+       (when (box? e)
+         (ddict-set! the-mapping var t))]))
 
 ;; add a single type to the mapping
 ;; identifier type -> void
-(define (register-type/undefined id type)
-  ;(printf "register-type/undef ~a\n" (syntax-e id))
-  (cond [(free-id-table-ref the-mapping id (lambda _ #f))
-         =>
-         (λ (t) ;; it's ok to annotate with the same type
-           (define t* (if (box? t) (unbox t) t))
-           (unless (equal? type t*)
-             (tc-error/delayed #:stx id "Duplicate type annotation of ~a for ~a, previous was ~a" type (syntax-e id) t*)))]
-        [else (free-id-table-set! the-mapping id (box type))]))
+(define (register-type/undefined var type)
+  (match (ddict-ref the-mapping var #f)
+    [#f (ddict-set! the-mapping var (box type))]
+    [t (define t* (if (box? t) (unbox t) t))
+       (unless (equal? type t*)
+         (tc-error/delayed #:stx (var-id var)
+                           "Duplicate type annotation of ~a for ~a, previous was ~a"
+                           type
+                           (syntax-e (var-id var))
+                           t*))]))
 
 ;; add a bunch of types to the mapping
 ;; listof[id] listof[type] -> void
@@ -62,47 +73,50 @@
 ;; if none found, calls lookup-fail
 ;; identifier -> type
 (define (lookup-type id [fail-handler (λ () (lookup-fail id))])
-  (define v (free-id-table-ref the-mapping id fail-handler))
-  (cond [(box? v) (unbox v)] 
+  (define v (ddict-ref the-mapping id fail-handler))
+  (cond [(box? v) (unbox v)]
         [(procedure? v) (define t (v)) (register-type id t) t]
         [else v]))
 
 (define-syntax-class typed-id^
   #:attributes (type)
   (pattern i:id
-    #:attr type (lookup-type #'i #f)
+    #:attr type (lookup-type (var #'i) #f)
     #:when (attribute type)))
 
-(define (maybe-finish-register-type id)
-  (let ([v (free-id-table-ref the-mapping id)])
+(define (maybe-finish-register-type var)
+  (let ([v (ddict-ref the-mapping var)])
     (if (box? v)
-        (register-type id (unbox v))
+        (register-type var (unbox v))
         #f)))
 
-(define (unregister-type id)
-  (free-id-table-remove! the-mapping id))
+(define (unregister-type var)
+  (ddict-remove! the-mapping var))
 
-(define (finish-register-type id [top-level? #f])
-  (unless (or (maybe-finish-register-type id) top-level?)
-    (tc-error/delayed #:stx id "Duplicate definition for ~a" (syntax-e id))))
+(define (finish-register-type var [top-level? #f])
+  (unless (or (maybe-finish-register-type var) top-level?)
+    (tc-error/delayed #:stx (var-id var)
+                      "Duplicate definition for ~a"
+                      (syntax-e (var-id var)))))
 
 (define (check-all-registered-types)
-  (free-id-table-for-each
-   the-mapping
-   (lambda (id e)
-     (when (box? e)
-       (let ([bnd (identifier-binding id)])
-         (tc-error/delayed #:stx id
-                           "Declaration for `~a' provided, but `~a' ~a"
-                           (syntax-e id) (syntax-e id)
-                           (cond [(eq? bnd 'lexical) "is a lexical binding"] ;; should never happen
-                                 [(not bnd) "has no definition"]
-                                 [else "is defined in another module"])))))))
+  (for* ([(var e) (in-ddict the-mapping)]
+         [id (in-value (var-id var))])
+    (when (box? e)
+      (let ([bnd (identifier-binding id)])
+        (tc-error/delayed #:stx id
+                          "Declaration for `~a' provided, but `~a' ~a"
+                          (syntax-e id) (syntax-e id)
+                          (cond [(eq? bnd 'lexical) "is a lexical binding"] ;; should never happen
+                                [(not bnd) "has no definition"]
+                                [else "is defined in another module"]))))))
 
 ;; map over the-mapping, producing a list
 ;; (id type -> T) -> listof[T]
 (define (type-env-map f)
-  (sorted-dict-map the-mapping f id<))
+  (for/list ([(var type) (in-ddict the-mapping)])
+    (f var type)))
 
 (define (type-env-for-each f)
-  (sorted-dict-for-each the-mapping f id<))
+  (for ([(var type) (in-ddict the-mapping)])
+    (f var type)))

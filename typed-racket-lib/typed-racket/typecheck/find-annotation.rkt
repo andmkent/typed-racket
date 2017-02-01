@@ -2,6 +2,7 @@
 
 (require "../utils/utils.rkt" syntax/parse
          (contract-req)
+         (rep var)
          (env lexical-env)
          (private type-annotation)
          (for-label racket/base))
@@ -58,12 +59,12 @@
        #:with n:id #'c.e
        #:with (v) #'(c.v ...)
        #:fail-unless (free-identifier=? name #'n) #f
-       (or (type-annotation #'v) (lookup-type/lexical #'v #:fail (lambda _ #f)))]
+       (or (type-annotation #'v) (lookup-var-type (var #'v) #:failure #f))]
       [c:lv-clause
        #:with (#%plain-app reverse n:id) #'c.e
        #:with (v) #'(c.v ...)
        #:fail-unless (free-identifier=? name #'n) #f
-       (or (type-annotation #'v) (lookup-type/lexical #'v #:fail (lambda _ #f)))]
+       (or (type-annotation #'v) (lookup-var-type (var #'v) #:failure #f))]
       [_ #f]))
   (syntax-parse stx
     #:literal-sets (kernel-literals)

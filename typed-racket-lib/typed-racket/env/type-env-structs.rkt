@@ -1,47 +1,42 @@
 #lang racket/base
 
 (require racket/match
-         syntax/id-table
          (except-in "../utils/utils.rkt" env)
          (contract-req)
-         (rep core-rep object-rep))
+         (rep core-rep object-rep var))
 
 (require-for-cond-contract (rep type-rep prop-rep))
 
 ;; types is a free-id-table of identifiers to types
 ;; props is a list of known propositions
-(define-struct/cond-contract env ([types immutable-free-id-table?] 
+(define-struct/cond-contract env ([types (hash/c var? Type?)] 
                                   [props (listof Prop?)]
-                                  [aliases immutable-free-id-table?])
+                                  [aliases (hash/c var? Object?)])
   #:transparent
   #:property prop:custom-write
   (lambda (e prt mode)
     (fprintf prt "(env ~a ~a ~a)"
-             (free-id-table-map (env-types e)
-                                (λ (id ty) (format "[~a ∈ ~a]" id ty)))
+             (hash-map (env-types e)
+                       (λ (id ty) (format "[~a ∈ ~a]" id ty)))
              (env-props e)
-             (free-id-table-map (env-aliases e)
-                                (λ (id ty) (format "[~a ≡ ~a]" id ty))))))
+             (hash-map (env-aliases e)
+                       (λ (id ty) (format "[~a ≡ ~a]" id ty))))))
 
 (provide/cond-contract
   [env? predicate/c]
-  [env-set-type (env? identifier? Type? . -> . env?)]
-  [env-extend/bindings (env? (listof identifier?)
+  [env-set-type (env? var? Type? . -> . env?)]
+  [env-extend/bindings (env? (listof var?)
                              (listof Type?)
                              (or/c (listof OptObject?) #f)
                              . -> .
                              env?)]
-  [env-lookup (env? identifier? (identifier? . -> . any) . -> . any)]
+  [env-lookup (env? var? any/c . -> . any)]
   [env-props (env? . -> . (listof Prop?))]
   [env-replace-props (env? (listof Prop?) . -> . env?)]
   [empty-env env?]
-  [env-lookup-alias (env? identifier? (identifier? . -> . (or/c OptObject? #f)) . -> . (or/c OptObject? #f))])
+  [env-lookup-alias (env? var? any/c . -> . any)])
 
-(define empty-env
-  (env
-    (make-immutable-free-id-table)
-    null
-    (make-immutable-free-id-table)))
+(define empty-env (env (hash) null (hash)))
 
 
 (define (env-replace-props e props)
@@ -50,13 +45,13 @@
 
 (define (env-lookup e key fail)
   (match-let ([(env tys _ _) e])
-    (free-id-table-ref tys key (λ () (fail key)))))
+    (hash-ref tys key fail)))
 
 
 ;; like hash-set, but for the type of an ident in the lexical environment
 (define (env-set-type e ident type)
   (match-let ([(env tys ps als) e])
-    (env (free-id-table-set tys ident type) ps als)))
+    (env (hash-set tys ident type) ps als)))
 
 ;; extends an environment with types and aliases
 ;; e : the 'env' struct to be updated
@@ -71,9 +66,9 @@
   ;; NOTE: we mutate the identifiers 'tys' and 'als' for convenience,
   ;; but the free-id-tables themselves are immutable.
   (define (update/type! id t)
-    (set! tys (free-id-table-set tys id t)))
+    (set! tys (hash-set tys id t)))
   (define (update/alias! id o)
-    (set! als (free-id-table-set als id o)))
+    (set! als (hash-set als id o)))
   (define (update/type+alias! id t o)
     (match o
       ;; no alias, so just record the type as usual
@@ -93,5 +88,5 @@
 
 (define (env-lookup-alias e key fail)
   (match-let ([(env _ _ als) e])
-    (free-id-table-ref als key (λ () (fail key)))))
+    (hash-ref als key fail)))
 

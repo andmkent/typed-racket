@@ -6,7 +6,6 @@
          "free-variance.rkt"
          "core-rep.rkt"
          "object-rep.rkt"
-         racket/match
          racket/lazy-require
          (only-in racket/unsafe/ops unsafe-fx<=))
 

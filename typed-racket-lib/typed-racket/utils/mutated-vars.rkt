@@ -1,22 +1,27 @@
 #lang racket/base
 
-(require racket/dict syntax/parse syntax/id-table racket/sequence)
+(require "utils.rkt"
+         (env mvar-env)
+         (rep var)
+         (contract-req)
+         racket/set
+         syntax/parse
+         syntax/id-table
+         racket/sequence)
+
+(provide/cond-contract
+ [find-mutated-vars! (->* (syntax?) (#:pred (or/c #f procedure?)) void?)])
 
 ;; find and add to mapping all the set!'ed variables in form
 ;; if the supplied mapping is mutable, mutates it
 ;; default is immutability
 ;; syntax [table] [pred] -> table
-(define (find-mutated-vars form
-                           [tbl (make-immutable-free-id-table)]
-                           [pred #f])
-  (define add (if (dict-mutable? tbl)
-                  (lambda (t i) (dict-set! t i #t) t)
-                  (lambda (t i) (dict-set t i #t))))
-  (let loop ([stx form] [tbl tbl])
+(define (find-mutated-vars! form #:pred [pred #f])
+  (let loop ([stx form])
     ;; syntax-list -> table
     (define (fmv/list lstx)
-      (for/fold ([tbl tbl]) ([stx (in-syntax lstx)])
-        (loop stx tbl)))
+      (for ([stx (in-syntax lstx)])
+        (loop stx)))
     (syntax-parse stx
       #:literal-sets (kernel-literals)
       ;; let us care about custom syntax classes
@@ -27,15 +32,17 @@
        (define-values (sub name)
          (values (car (attribute result))
                  (cadr (attribute result))))
-       (add (loop sub tbl) name)]
+       (set-add! mvars (var name))
+       (loop sub)]
       ;; what we care about: set!
       [(set! v e)
        #:when (not pred)
-       (add (loop #'e tbl) #'v)]
+       (set-add! mvars (var #'v))
+       (loop #'e)]
       ;; forms with expression subforms
       [(define-values (var ...) expr)
-       (loop #'expr tbl)]
-      [(#%expression e) (loop #'e tbl)]
+       (loop #'expr)]
+      [(#%expression e) (loop #'e)]
       [(#%plain-app . rest) (fmv/list #'rest)]
       [(begin . rest) (fmv/list #'rest)]
       [(begin0 . rest) (fmv/list #'rest)]
@@ -48,6 +55,4 @@
       [(letrec-values ([_ e] ...) b ...) (fmv/list #'(b ... e ...))]
       [(#%plain-module-begin . forms) (fmv/list #'forms)]
       ;; all the other forms don't have any expression subforms (like #%top)
-      [_ tbl])))
-
-(provide find-mutated-vars)
+      [_ (void)])))

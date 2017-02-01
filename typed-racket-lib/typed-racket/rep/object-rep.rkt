@@ -6,14 +6,11 @@
 ;; See "Logical Types for Untyped Languages" pg.3
 
 (require "../utils/utils.rkt"
-         racket/match
-         "rep-utils.rkt"
-         "core-rep.rkt"
-         "free-variance.rkt"
+         (rep rep-utils core-rep var free-variance)
          (env mvar-env)
          (contract-req))
 
-(provide -id-path name-ref=?)
+(provide -id-path)
 
 (def-pathelem CarPE () [#:singleton -car])
 (def-pathelem CdrPE () [#:singleton -cdr])
@@ -32,17 +29,20 @@
   [#:for-each (f) (for-each f elems)]
   [#:custom-constructor
    (cond
-     [(identifier? name)
+     [(pair? name)
+      (intern-double-ref!
+       path-intern-table
+       name elems #:construct (make-Path elems name))]
+     [else
       (if (is-var-mutated? name)
           -empty-obj
-          (let ([name (normalize-id name)])
-            (intern-double-ref!
-             path-intern-table
-             name elems #:construct (make-Path elems name))))]
-     [else (intern-double-ref!
-            path-intern-table
-            name elems #:construct (make-Path elems name))])])
+          (intern-double-ref!
+           path-intern-table
+           name elems #:construct (make-Path elems name)))])])
 
 (define path-intern-table (make-weak-hash))
 
-(define (-id-path name) (make-Path null name))
+(define (-id-path name)
+  (if (identifier? name)
+      (make-Path null (var name))
+      (make-Path null name)))

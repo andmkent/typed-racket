@@ -4,7 +4,7 @@
          syntax/struct syntax/parse racket/function racket/match racket/list
 
          (prefix-in c: (contract-req))
-         (rep type-rep object-rep free-variance)
+         (rep type-rep object-rep free-variance var)
          (private parse-type syntax-properties)
          (types abbrev subtype utils resolve substitute struct-table prefab)
          (env global-env type-name-env type-alias-env tvar-env)
@@ -15,7 +15,8 @@
 (require-for-cond-contract racket/struct-info)
 
 (provide tc/struct
-         name-of-struct d-s
+         name-of-struct
+         d-s
          refine-struct-variance!
          register-parsed-struct-sty!
          register-parsed-struct-bindings!)
@@ -25,23 +26,17 @@
   (pattern (name:id par:id))
   (pattern name:id #:attr par #f))
 
-;; sty : (U Struct? Prefab?)
-;; names : struct-names
-;; desc : struct-desc
-;; struct-info : struct-info?
-;; type-only : Boolean
-(struct parsed-struct (sty names desc struct-info type-only) #:transparent)
 
-;; struct-name : Id  (the identifier for the static struct info,
-;;                    usually the same as the type-name)
-;; type-name : Id    (the identifier for the type name)
-;; struct-type : Id  (the identifier for the struct type binding)
-;; constructor : Id
-;; extra-constructor : (Option Id)
-;; predicate : Id
-;; getters : Listof[Id]
-;; setters : Listof[Id] or #f
-(struct struct-names (struct-name type-name struct-type constructor extra-constructor predicate getters setters) #:transparent)
+(define-struct/cond-contract struct-names
+  ([struct-name identifier?] ;; id for struct info, often same as type-name
+   [type-name identifier?]   ;; id foir type name
+   [struct-type identifier?] ;; id for struct type binding
+   [constructor identifier?]
+   [extra-constructor (c:or/c identifier? #f)]
+   [predicate identifier?]
+   [getters (c:listof identifier?)]
+   [setters (c:listof identifier?)])
+#:transparent)
 
 ;; struct-desc holds all the relevant information about a struct type's types
 ;; parent-fields : (Listof Type)
@@ -50,9 +45,27 @@
 ;; mutable: Any
 ;; parent-mutable: Any
 ;; proc-ty: (Option Type)
-(struct struct-desc (parent-fields self-fields tvars
-                     mutable parent-mutable proc-ty)
-        #:transparent)
+(define-struct/cond-contract struct-desc
+  ([parent-fields (c:listof Type?)]
+   [self-fields (c:listof Type?)]
+   [tvars (c:listof symbol?)]
+   [mutable c:any/c]
+   [parent-mutable c:any/c]
+   [proc-ty (c:or/c #f Type?)])
+  #:transparent)
+
+;; sty : (U Struct? Prefab?)
+;; names : struct-names
+;; desc : struct-desc
+;; struct-info : struct-info?
+;; type-only : Boolean
+(define-struct/cond-contract parsed-struct
+  ([sty (c:or/c Struct? Prefab?)]
+   [names struct-names?]
+   [desc struct-desc?]
+   [struct-info struct-info?]
+   [type-only boolean?])
+  #:transparent)
 
 (define (struct-desc-all-fields fields)
   (append (struct-desc-parent-fields fields) (struct-desc-self-fields fields)))
@@ -73,15 +86,15 @@
       (if (attribute v.par)
           (let* ([parent0 (parse-type #'v.par)]
                  ;; TODO ensure this is a struct
-                 [parent (let loop ((parent parent0))
+                 [parent (let loop ([parent parent0])
                                (cond
-                                 ((Name? parent) (loop (resolve-name parent)))
-                                 ((or (Poly? parent) (Mu? parent)
+                                 [(Name? parent) (loop (resolve-name parent))]
+                                 [(or (Poly? parent) (Mu? parent)
                                       (if prefab? (Prefab? parent) (Struct? parent)))
-                                  parent)
-                                 (else
+                                  parent]
+                                 [else
                                   (tc-error/stx #'v.par "parent type not a valid structure name: ~a"
-                                                (syntax->datum #'v.par)))))])
+                                                (syntax->datum #'v.par))]))])
                 (values #'v.name parent0 parent))
           (values #'v.name #f #f))]))
 
@@ -117,12 +130,14 @@
 
   (let* ([this-flds (for/list ([t (in-list (struct-desc-self-fields desc))]
                                [g (in-list (struct-names-getters names))])
-                       (make-fld t g (struct-desc-mutable desc)))]
+                       (make-fld t (var g) (struct-desc-mutable desc)))]
          [flds (append (get-flds parent) this-flds)])
-    (make-Struct (struct-names-struct-name names)
-                 parent flds (struct-desc-proc-ty desc)
+    (make-Struct (var (struct-names-struct-name names))
+                 parent
+                 flds
+                 (struct-desc-proc-ty desc)
                  (not (null? (struct-desc-tvars desc)))
-                 (struct-names-predicate names))))
+                 (var (struct-names-predicate names)))))
 
 
 ;; construct all the various types for structs, and then register the approriate names
@@ -133,12 +148,12 @@
 
   ;; a type alias needs to be registered here too, to ensure
   ;; that parse-type will map the identifier to this Name type
-  (define type-name (struct-names-type-name names))
-  (register-resolved-type-alias
-   type-name
-   (make-Name type-name (length (struct-desc-tvars desc)) (Struct? sty)))
-  (register-type-name type-name
-                      (make-Poly (struct-desc-tvars desc) sty)))
+  (let ([type-name (var (struct-names-type-name names))])
+    (register-resolved-type-alias
+     type-name
+     (make-Name type-name (length (struct-desc-tvars desc)) (Struct? sty)))
+    (register-type-name type-name
+                        (make-Poly (struct-desc-tvars desc) sty))))
 
 
 
@@ -159,7 +174,7 @@
 
   ;; the base-type, with free type variables
   (define name-type
-    (make-Name (struct-names-type-name names) (length tvars) #t))
+    (make-Name (var (struct-names-type-name names)) (length tvars) #t))
   (define poly-base
     (if (null? tvars)
         name-type
@@ -196,13 +211,13 @@
                       (if mutable
                           (->* (list poly-base) t)
                           (->acc (list poly-base) t (list path))))])
-          (add-struct-fn! g path #f)
+          (add-struct-fn! (var g) path #f)
           (make-def-binding g func)))
       (if mutable
           (for/list ([s (in-list (struct-names-setters names))]
                      [t (in-list self-fields)]
                      [i (in-naturals parent-count)])
-            (add-struct-fn! s (make-StructPE poly-base i) #t)
+            (add-struct-fn! (var s) (make-StructPE poly-base i) #t)
             (make-def-binding s (poly-wrapper (->* (list poly-base t) -Void))))
           null))))
 
@@ -218,17 +233,19 @@
                                       (poly-wrapper (->* all-fields poly-base))))
               null)))
 
-  (for ([b (append constructor-bindings bindings)])
-    (register-type (binding-name b) (def-binding-ty b)))
+  (for* ([b (append constructor-bindings bindings)]
+         [var (in-value (var (binding-name b)))]
+         [ty (in-value (def-binding-ty b))])
+    (register-type var ty))
 
   (append
-    (if (free-identifier=? (struct-names-type-name names)
-                           (struct-names-constructor names))
-      null
-      (list constructor-binding))
+   (if (free-identifier=? (struct-names-type-name names)
+                          (struct-names-constructor names))
+       null
+       (list constructor-binding))
    (cons
-     (make-def-struct-stx-binding (struct-names-type-name names) si (def-binding-ty constructor-binding))
-     bindings)))
+    (make-def-struct-stx-binding (struct-names-type-name names) si (def-binding-ty constructor-binding))
+    bindings)))
 
 (define (register-parsed-struct-sty! ps)
   (match ps
@@ -247,10 +264,10 @@
 (define (refine-struct-variance! parsed-structs)
   (define stys (map parsed-struct-sty parsed-structs))
   (define tvarss (map (compose struct-desc-tvars parsed-struct-desc) parsed-structs))
-  (define names
+  (define name-vars
     (for/list ([parsed-struct (in-list parsed-structs)])
-      (struct-names-type-name (parsed-struct-names parsed-struct))))
-  (refine-variance! names stys tvarss))
+      (var (struct-names-type-name (parsed-struct-names parsed-struct)))))
+  (refine-variance! name-vars stys tvarss))
 
 ;; check and register types for a define struct
 ;; tc/struct : Listof[identifier] (U identifier (list identifier identifier))
@@ -353,7 +370,7 @@
            (c:listof Type?) (c:or/c #f identifier?)
            c:any/c)
   (define parent-type
-    (and parent (resolve-name (make-Name parent 0 #t))))
+    (and parent (resolve-name (make-Name (var parent) 0 #t))))
   (define parent-tys (map fld-t (get-flds parent-type)))
 
   (define names (get-struct-names nm nm fld-names #f #f))
@@ -364,7 +381,7 @@
   (register-sty! sty names desc)
   (register-struct-bindings! sty names desc #f)
   (when kernel-maker
-    (register-type kernel-maker (λ () (->* (struct-desc-all-fields desc) sty)))))
+    (register-type (var kernel-maker) (λ () (->* (struct-desc-all-fields desc) sty)))))
 
 ;; syntax for tc/builtin-struct
 (define-syntax (d-s stx)

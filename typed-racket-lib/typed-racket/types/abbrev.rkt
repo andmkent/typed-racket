@@ -12,7 +12,7 @@
          racket/function
 
          (prefix-in c: (contract-req))
-         (rep rep-utils type-rep prop-rep object-rep values-rep)
+         (rep rep-utils type-rep prop-rep object-rep values-rep var)
          (types numeric-tower prefab)
          ;; Using this form so all-from-out works
          "base-abbrev.rkt" "match-expanders.rkt"
@@ -167,7 +167,7 @@
 
 ;; Type alias names
 (define (-struct-name name)
-  (make-Name name 0 #t))
+  (make-Name (if (identifier? name) (var name) name) 0 #t))
 
 ;; Structs
 (define (-struct name parent flds [proc #f] [poly #f] [pred #'dummy])

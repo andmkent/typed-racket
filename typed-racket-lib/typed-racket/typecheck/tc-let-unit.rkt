@@ -9,7 +9,7 @@
               global-env scoped-tvar-env 
               signature-env signature-helper
               type-env-structs)
-         (rep prop-rep object-rep type-rep)
+         (rep prop-rep object-rep type-rep var)
          syntax/free-vars
          (typecheck signatures tc-metafunctions tc-subst internal-forms tc-envops)
          (utils tarjan)
@@ -41,12 +41,12 @@
 ;; to the local identifiers found in 'namess'
 ;;
 ;; returns : 4 lists of index-associated values:
-;;           names
+;;           vars
 ;;           types
 ;;           aliased-objs
 ;;           props
-;;  - names is the idents bound for the body of this let
-;;    (i.e. (flatten namess))
+;;  - vars is the idents bound for the body of this let
+;;    (i.e. (map var (flatten namess)))
 ;;  - types[i] is the type which should be added to Γ for names[i].
 ;;  - aliased-objs[i] is the object which names[i] is an alias for,
 ;;    where Empty means it aliases no syntactic object.
@@ -60,13 +60,14 @@
                             (for/and ([ns (in-list nss)]
                                       [ts (in-list tss)])
                               (= (length ns) (length ts))))
-       (values [names (listof identifier?)]
+       (values [names (listof var?)]
                [types (listof Type?)]
                [aliased-objs (listof OptObject?)]
                [props (listof Prop?)]))
   (for*/lists (idents types aliased-objects propositions)
               ([(names results) (in-parallel (in-list namess) (in-list rhs-typess))]
-               [(name result) (in-parallel (in-list names) (in-list results))])
+               [(name result) (in-parallel (in-list names) (in-list results))]
+               [name (in-value (var name))])
     (match-define (tc-result: type p+/p- obj) result)
     (define mutated? (is-var-mutated? name))
     ;; n-obj is the object naming n (unless n is mutated, then
@@ -105,21 +106,21 @@
    (#:before-check-body (-> any/c))
    . ->* .
    tc-results/c)
-  (define-values (idents types aliased-objs props)
+  (define-values (vars types aliased-objs props)
     (consolidate-bound-ids-info bound-idss bound-resultss))
-  (define ids-to-erase
-    (for/list ([id (in-list idents)]
+  (define vars-to-erase
+    (for/list ([x (in-list vars)]
                [obj (in-list aliased-objs)]
                #:when (Empty? obj))
-      id))
+      x))
   ;; extend the lexical environment for checking the body
   ;; with types and potential aliases
   (with-extended-lexical-env
-    [#:identifiers idents
+    [#:vars vars
      #:types types
      #:aliased-objects aliased-objs]
-    (erase-names
-     ids-to-erase
+    (erase-vars
+     vars-to-erase
      (with-lexical-env+props
        props
        #:expected expected
@@ -297,12 +298,13 @@
              (get-type/infer names expr
                              (lambda (e) (tc-expr/maybe-expected/t e names))
                              tc-expr/check))
-           (with-extended-lexical-env
-             [#:identifiers names
-              #:types ts]
-             (replace-names names
-                            os
-                            (loop (cdr clauses))))])))
+           (let ([vars (map var names)])
+             (with-extended-lexical-env
+                 [#:vars vars
+                  #:types ts]
+               (replace-vars vars
+                             os
+                             (loop (cdr clauses)))))])))
 
 ;; this is so match can provide us with a syntax property to
 ;; say that this binding is only called in tail position

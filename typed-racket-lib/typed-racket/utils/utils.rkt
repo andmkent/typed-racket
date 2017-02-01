@@ -28,7 +28,7 @@ at least theoretically.
  bind)
 
 (define optimize? (make-parameter #t))
-(define-for-syntax enable-contracts? (and (getenv "PLT_TR_CONTRACTS") #t))
+(define-for-syntax enable-contracts? (and #;(getenv "PLT_TR_CONTRACTS") #t))
 
 (define-syntax do-contract-req
   (if enable-contracts?
@@ -166,8 +166,8 @@ at least theoretically.
           #:attributes (i)
           (pattern [(~datum struct) (~or nm:id (nm:id super:id)) (flds ...)]
                    #:with i #'(struct-out nm))
-          (pattern [(~datum rename) out:id in:id cnt:expr]
-                   #:with i #'(rename-out [out in]))
+          (pattern [(~datum rename) orig-name:id export-name:id cnt:expr]
+                   #:with i #'(rename-out [orig-name export-name]))
           (pattern [i:id cnt:expr]))
         (syntax-parse stx
           [(_ c:clause ...)

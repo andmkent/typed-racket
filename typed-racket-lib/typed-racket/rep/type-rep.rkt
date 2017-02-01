@@ -7,14 +7,10 @@
 
 ;; TODO use contract-req
 (require (utils tc-utils)
-         "rep-utils.rkt"
+         (rep rep-utils values-rep type-mask free-variance
+              base-types numeric-base-types var)
          "core-rep.rkt"
-         "values-rep.rkt"
-         "type-mask.rkt"
-         "free-variance.rkt"
          "base-type-rep.rkt"
-         "base-types.rkt"
-         "numeric-base-types.rkt"
          "base-union.rkt"
          racket/match racket/list
          syntax/id-table
@@ -110,8 +106,6 @@
   [#:fmap (_ #:self self) self]
   [#:for-each (_) (void)])
 
-(define Name-table (make-free-id-table))
-
 ;; Name, an indirection of a type through the environment
 ;;
 ;; interp.
@@ -120,12 +114,17 @@
 ;; id is the name stored in the environment
 ;; args is the number of arguments expected by this Name type
 ;; struct? indicates if this maps to a struct type
-(def-type Name ([id identifier?]
+(def-type Name ([var var?]
                 [args exact-nonnegative-integer?]
                 [struct? boolean?])
   #:base
   [#:custom-constructor
-   (free-id-table-ref! Name-table id (λ () (make-Name id args struct?)))])
+   (intern-single-ref!
+    name-intern-table
+    var
+    #:construct (make-Name var args struct?))])
+
+(define name-intern-table (make-hash))
 
 ;; rator is a type
 ;; rands is a list of types
@@ -446,10 +445,7 @@
   [#:mask (λ (t) (mask (PolyRow-body t)))])
 
 
-(def-type Opaque ([pred identifier?])
-  #:base
-  [#:custom-constructor
-   (make-Opaque (normalize-id pred))])
+(def-type Opaque ([pred var?]) #:base)
 
 
 
@@ -522,22 +518,20 @@
   [#:for-each (f) (for-each f arities)])
 
 
-(def-rep fld ([t Type?] [acc identifier?] [mutable? boolean?])
+(def-rep fld ([t Type?] [acc var?] [mutable? boolean?])
   [#:frees (f) (if mutable? (make-invariant (f t)) (f t))]
   [#:fmap (f) (make-fld (f t) acc mutable?)]
-  [#:for-each (f) (f t)]
-  [#:custom-constructor
-   (make-fld t (normalize-id acc) mutable?)])
+  [#:for-each (f) (f t)])
 
 ;; poly? : is this type polymorphically variant
 ;;         If not, then the predicate is enough for higher order checks
 ;; pred-id : identifier for the predicate of the struct
-(def-type Struct ([name identifier?]
+(def-type Struct ([name var?]
                   [parent (or/c #f Struct?)]
                   [flds (listof fld?)]
                   [proc (or/c #f Function?)]
                   [poly? boolean?]
-                  [pred-id identifier?])
+                  [pred-id var?])
   [#:frees (f) (combine-frees (map f (append (if proc (list proc) null)
                                              (if parent (list parent) null)
                                              flds)))]
@@ -552,14 +546,7 @@
    (for-each f flds)
    (when proc (f proc))]
   ;; This should eventually be based on understanding of struct properties.
-  [#:mask (mask-union mask:struct mask:procedure)]
-  [#:custom-constructor
-   (make-Struct (normalize-id name)
-                parent
-                flds
-                proc
-                poly?
-                (normalize-id pred-id))])
+  [#:mask (mask-union mask:struct mask:procedure)])
 
 ;; Represents prefab structs
 ;; key  : prefab key encoding mutability, auto-fields, etc.
@@ -810,12 +797,11 @@
          [_ (loop (set-add elems t) ts)])])))
 
 
-(def-type Refinement ([parent Type?] [pred identifier?])
+(def-type Refinement ([parent Type?] [pred var?])
   [#:frees (f) (f parent)]
   [#:fmap (f) (make-Refinement (f parent) pred)]
   [#:for-each (f) (f parent)]
-  [#:mask (λ (t) (mask (Refinement-parent t)))]
-  [#:custom-constructor (make-Refinement parent (normalize-id pred))])
+  [#:mask (λ (t) (mask (Refinement-parent t)))])
 
 ;; A Row used in type instantiation
 ;; For now, this should not appear in user code. It's used
@@ -896,9 +882,9 @@
 ;; extends is the extended signature or #f
 ;; mapping maps variables in a signature to their types
 ;; This is not a type because signatures do not correspond to any values
-(def-rep Signature ([name identifier?]
-                    [extends (or/c identifier? #f)]
-                    [mapping (listof (cons/c identifier? Type?))])
+(def-rep Signature ([name var?]
+                    [extends (or/c var? #f)]
+                    [mapping (listof (cons/c var? Type?))])
   [#:frees (f) (combine-frees (map (match-lambda
                                      [(cons _ t) (f t)])
                                    mapping))]
@@ -907,13 +893,7 @@
                                                 mapping))]
   [#:for-each (f) (for-each (match-lambda
                               [(cons _ t) (f t)])
-                            mapping)]
-  [#:custom-constructor
-   (make-Signature (normalize-id name)
-                   (and extends (normalize-id extends))
-                   (for*/list ([p (in-list mapping)]
-                               [(id ty) (in-pair p)])
-                     (cons (normalize-id id) ty)))])
+                            mapping)])
 
 
 (def-type UnitTop ()

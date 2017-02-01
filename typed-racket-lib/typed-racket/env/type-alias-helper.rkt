@@ -3,12 +3,14 @@
 ;; This module provides helper functions for type aliases
 
 (require "../utils/utils.rkt"
+         (contract-req)
          (utils tarjan tc-utils)
          (env type-alias-env type-name-env)
-         (rep type-rep)
+         (rep type-rep var)
          (private parse-type)
          (typecheck internal-forms)
-         (types resolve base-abbrev)
+         (except-in (types resolve base-abbrev)
+                    -> ->*)
          racket/list
          racket/match
          syntax/id-table
@@ -16,12 +18,19 @@
          (for-template
           (typecheck internal-forms)
           racket/base))
-
-(provide find-strongly-connected-type-aliases
-         check-type-alias-contractive
-         get-type-alias-info
-         register-all-type-aliases
-         parse-type-alias)
+;; Dict<Id, (List Type Listof<Id>)> -> Listof<Listof<Id>>
+(provide/cond-contract
+ [find-strongly-connected-type-aliases
+  (-> (listof (list/c var? Type? (listof var?))) (listof (listof var?)))]
+ [check-type-alias-contractive
+  (-> var? Type? boolean?)]
+ [get-type-alias-info
+  (-> (listof syntax?) (values (listof var?)
+                               (listof (cons/c var? any/c))))]
+ [register-all-type-aliases
+  (-> (listof var?) (listof (cons/c var? any/c)) void?)]
+ [parse-type-alias
+  (-> syntax? (values syntax? syntax? (listof syntax?)))])
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
@@ -37,10 +46,10 @@
 ;;
 ;; Returns the components in topologically sorted order
 (define (find-strongly-connected-type-aliases dep-map)
-  (define vertex-map (make-free-id-table))
+  (define vertex-map (make-hash))
   (for ([entry (in-list dep-map)])
-    (match-define (cons id adjacent) entry)
-    (free-id-table-set! vertex-map id (make-vertex id adjacent)))
+    (match-define (cons var adjacent) entry)
+    (hash-set! vertex-map var (make-vertex var adjacent)))
   (define components (tarjan vertex-map))
   ;; extract the identifiers out of the results since we
   ;; don't need the whole vertex
@@ -60,7 +69,7 @@
     [((Union: _ ts)) (andmap check ts)]
     [((Intersection: elems)) (andmap check elems)]
     [((Name/simple: name-id))
-     (and (not (free-identifier=? name-id id))
+     (and (not (var=? name-id id))
           (check (resolve-once type)))]
     [((App: rator rands))
      (and (check rator) (check rands))]
@@ -82,17 +91,18 @@
 (define (get-type-alias-info type-aliases)
   (for/lists (_1 _2) ([type-alias (in-list type-aliases)])
     (define-values (id type-stx args) (parse-type-alias type-alias))
+    (define x (var id))
     ;; Register type alias names with a dummy value so that it's in
     ;; scope for the registration later.
-    (register-resolved-type-alias id Err)
-    (values id (list id type-stx args))))
+    (register-resolved-type-alias x Err)
+    (values x (list x type-stx args))))
 
 ;; Identifier -> Type
 ;; Construct a fresh placeholder type
 (define (make-placeholder-type id)
   (make-Opaque id))
 
-;; register-all-type-aliases : Listof<Id> Dict<Id, TypeAliasInfo> -> Void
+;; register-all-type-aliases : Listof<var> Dict<var, TypeAliasInfo> -> Void
 ;;
 ;; Given parsed type aliases and a type alias map, do the work
 ;; of actually registering the type aliases. If struct names or
@@ -112,7 +122,8 @@
   (define-values (type-alias-dependency-map type-alias-class-map)
     (for/lists (_1 _2)
       ([entry (in-list type-alias-map)])
-      (match-define (cons name alias-info) entry)
+      (match-define (cons name-var alias-info) entry)
+      (define name name-var)
       (define links-box (box null))
       (define class-box (box null))
       (define type
@@ -121,12 +132,11 @@
                        [current-referenced-class-parents class-box])
           (parse-type (car alias-info))))
       (define pre-dependencies
-        (remove-duplicates (unbox links-box) free-identifier=?))
+        (remove-duplicates (unbox links-box) var=?))
       (define (filter-by-type-alias-names names)
-        (for/list ([id (in-list names)]
-                   #:when (memf (λ (id2) (free-identifier=? id id2))
-                                type-alias-names))
-          id))
+        (for/list ([name-var (in-list names)]
+                   #:when (member name-var type-alias-names var=?))
+          name-var))
       (define alias-dependencies
         (filter-by-type-alias-names pre-dependencies))
       (define class-dependencies
@@ -142,9 +152,9 @@
 
   ;; helper function for defining singletons
   (define (has-self-cycle? component [map type-alias-dependency-map])
-    (define id (car component))
-    (memf (λ (id2) (free-identifier=? id id2))
-          (cdr (assoc id map))))
+    (define name-var (car component))
+    (memf (λ (var2) (var=? name-var var2))
+          (cdr (assf (λ (var2) (var=? name-var var2)) map))))
 
   ;; A singleton component can be either a self-cycle or a node that
   ;; that does not participate in cycles, so we disambiguate
@@ -173,13 +183,13 @@
     (for/list ([component (in-list (reverse class-components))]
                #:when (member (car component)
                               recursive-aliases
-                              free-identifier=?))
+                              var=?))
       (car component)))
   (define other-recursive-aliases
     (for/list ([alias (in-list recursive-aliases)]
                #:unless (member alias
                                 class-aliases
-                                free-identifier=?))
+                                var=?))
       alias))
 
   ;; Actually register recursive type aliases
@@ -217,32 +227,33 @@
 
   ;; Checks whether two aliases are in the same connected component.
   ;; Used for the polymorphic recursion check below.
-  (define (in-same-component? id id2)
+  (define (in-same-component? var1 var2)
     (for/or ([component (in-list (append components class-components))])
-      (and (member id component free-identifier=?)
-           (member id2 component free-identifier=?))))
+      (and (member var1 component var=?)
+           (member var2 component var=?))))
 
   ;; Finish registering recursive aliases
   ;; names-to-refine : Listof<Id>
   ;; types-to-refine : Listof<Type>
   ;; tvarss          : Listof<Listof<Symbol>>
   (define-values (names-to-refine types-to-refine tvarss)
-    (for/lists (_1 _2 _3)
-      ([id (in-list (append other-recursive-aliases class-aliases))])
-      (define record (assoc id type-alias-map))
+    (for*/lists (_1 _2 _3)
+      ([name (in-list (append other-recursive-aliases class-aliases))]
+       [name (in-value name)])
+      (define record (assf (λ (x) (var=? name x)) type-alias-map))
       (match-define (list _ type-stx args) record)
       (define type
         ;; make sure to reject the type if it uses polymorphic
         ;; recursion (see resolve.rkt)
         (parameterize ([current-check-polymorphic-recursion
-                        `#s(poly-rec-info ,(λ (id2) (in-same-component? id id2))
+                        `#s(poly-rec-info ,(λ (id2) (in-same-component? name id2))
                                           ,args)])
           (parse-type type-stx)))
       (reset-resolver-cache!)
-      (register-type-name id type)
-      (add-constant-variance! id args)
-      (check-type-alias-contractive id type)
-      (values id type (map syntax-e args))))
+      (register-type-name name type)
+      (add-constant-variance! name args)
+      (check-type-alias-contractive name type)
+      (values name type (map syntax-e args))))
 
   ;; Finally, do a last pass to refine the variance
   (refine-variance! names-to-refine types-to-refine tvarss))

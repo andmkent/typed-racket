@@ -13,6 +13,7 @@
          (env type-env-structs global-env)
          (utils tc-utils)
          (only-in (rep type-rep) Type?)
+         (rep var)
          (typecheck renamer)
          (except-in (types utils abbrev kw-types) -> ->* one-of/c))
 
@@ -22,10 +23,8 @@
          with-lexical-env 
          with-extended-lexical-env)
 (provide/cond-contract
- [lookup-type/lexical ((identifier?) (env? #:fail (or/c #f Type? (-> any/c (or/c Type? #f))))
-                       . ->* .
-                       (or/c Type? #f))]
- [lookup-alias/lexical ((identifier?) (env?) . ->* . (or/c Path? Empty?))])
+ [lookup-var-type ((var?) (env? #:failure any/c) . ->* . any/c)]
+ [lookup-var-alias ((var?) (env?) . ->* . (or/c Path? Empty?))])
 
 ;; the current lexical environment
 (define lexical-env (make-parameter empty-env))
@@ -37,45 +36,55 @@
 ;; run code in an extended env
 (define-syntax (with-extended-lexical-env stx)
   (syntax-parse stx
-    [(_ [#:identifiers ids:expr
+    [(_ [#:vars vars:expr
          #:types tys:expr
          (~optional (~seq #:aliased-objects objs:expr)
                     #:defaults ([objs #'#f]))]
         . body)
      (syntax/loc stx
-       (with-lexical-env (env-extend/bindings (lexical-env) ids tys objs) . body))]))
+       (with-lexical-env (env-extend/bindings (lexical-env) vars tys objs) . body))]))
 
+(define *missing* (gensym 'missing))
 
 ;; find the type of identifier i, looking first in the lexical env, then in the top-level env
 ;; identifier -> Type
-(define (lookup-type/lexical i [env (lexical-env)] #:fail [fail #f])
-  (env-lookup env i (λ (i) (lookup-type i (λ ()
-                                            (cond 
-                                              [(syntax-property i 'constructor-for)
-                                               => (λ (prop)
-                                                    (define orig (un-rename prop))
-                                                    (define t (lookup-type/lexical orig env))
-                                                    (register-type i t)
-                                                    t)]
-                                              [(syntax-procedure-alias-property i)
-                                               => (λ (prop)
-                                                    (define orig (car (flatten prop)))
-                                                    (define t (lookup-type/lexical orig env))
-                                                    (register-type i t)
-                                                    t)]
-                                              [(syntax-procedure-converted-arguments-property i)
-                                               => (λ (prop)
-                                                    (define orig (car (flatten prop)))
-                                                    (define pre-t
-                                                      (lookup-type/lexical
-                                                       orig env #:fail (lambda (i) (lookup-fail i) #f)))
-                                                    (define t (if pre-t
-                                                                  (kw-convert pre-t #f)
-                                                                  Err))
-                                                    (register-type i t)
-                                                    t)]
-                                              [else ((or fail lookup-fail) i)]))))))
+(define (lookup-var-type x [env (lexical-env)]
+                         #:failure [fail *missing*])
+  (define lexical-ty (env-lookup env x fail))
+  (cond
+    [(not (eq? *missing* lexical-ty)) lexical-ty]
+    [(lookup-type x #f)]
+    [(var-id x)
+     => (λ (id) (cond
+                  [(syntax-property id 'constructor-for)
+                   => (λ (prop)
+                        (define orig (var (un-rename prop)))
+                        (define t (lookup-var-type orig env))
+                        (register-type id t)
+                        t)]
+                  [(syntax-procedure-alias-property id)
+                   => (λ (prop)
+                        (define orig (var (car (flatten prop))))
+                        (define t (lookup-var-type orig env))
+                        (register-type id t)
+                        t)]
+                  [(syntax-procedure-converted-arguments-property id)
+                   => (λ (prop)
+                        (define orig (var (car (flatten prop))))
+                        (define pre-t
+                          (lookup-var-type
+                           orig env #:failure (λ () (lookup-fail id) #f)))
+                        (define t (if pre-t
+                                      (kw-convert pre-t #f)
+                                      Err))
+                        (register-type id t)
+                        t)]
+                  [fail (if (procedure? fail) (fail) fail)]
+                  [else (lookup-fail id)]))]
+    [else (int-err "~a is an internal variable w/o a type! ~a" x)]))
 
 ;; looks up the representative object for an id (i.e. itself or an alias if one exists)
-(define (lookup-alias/lexical i [env (lexical-env)])
-  (env-lookup-alias env i -id-path))
+(define (lookup-var-alias var [env (lexical-env)])
+  (cond
+    [(env-lookup-alias env var #f)]
+    [else (-id-path var)]))

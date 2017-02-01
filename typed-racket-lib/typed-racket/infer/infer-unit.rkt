@@ -12,7 +12,7 @@
           (combine-in
            (utils tc-utils)
            (rep free-variance type-rep prop-rep object-rep
-                values-rep rep-utils type-mask)
+                values-rep rep-utils type-mask var)
            (types utils abbrev numeric-tower subtype resolve
                   substitute generalize prefab)
            (env index-env tvar-env))
@@ -565,8 +565,8 @@
 
         ;; two structs with the same name
         ;; just check pairwise on the fields
-        [((Struct: nm _ flds proc _ _) (Struct: nm* _ flds* proc* _ _))
-         #:when (free-identifier=? nm nm*)
+        [((Struct: n _ flds proc _ _) (Struct: n* _ flds* proc* _ _))
+         #:when (var=? n n*)
          (let ([proc-c
                 (cond [(and proc proc*)
                        (cg proc proc*)]
@@ -588,7 +588,7 @@
 
         ;; two struct names, need to resolve b/c one could be a parent
         [((Name: n _ #t) (Name: n* _ #t))
-         (if (free-identifier=? n n*)
+         (if (var=? n n*)
              empty ;; just succeed now
              (% cg (resolve-once S) (resolve-once T)))]
         ;; pairs are pointwise

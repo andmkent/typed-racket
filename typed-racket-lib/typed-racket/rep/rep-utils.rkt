@@ -1,14 +1,10 @@
 #lang racket/base
 (require "../utils/utils.rkt"
          (utils tc-utils)
-         
+         (rep var type-mask free-variance)
          racket/match
          (contract-req)
-         "free-variance.rkt"
-         "type-mask.rkt"
-         racket/stxparam
          syntax/parse/define
-         syntax/id-table
          racket/generic
          (only-in racket/unsafe/ops unsafe-struct-ref)
          (for-syntax
@@ -37,27 +33,7 @@
        (>= (length l) len)))
 
 (define-for-cond-contract name-ref/c
-  (or/c identifier?
-        (cons/c exact-integer? exact-integer?)))
-
-(define (name-ref=? x y)
-  (cond
-    [(identifier? x)
-     (and (identifier? y) (free-identifier=? x y))]
-    [else (equal? x y)]))
-
-(define id-table (make-free-id-table))
-(define (normalize-id id)
-  (free-id-table-ref! id-table id id))
-
-(define (hash-id id)
-  (eq-hash-code (identifier-binding-symbol id)))
-
-(define (hash-name-ref name rec)
-  (if (identifier? name)
-      (hash-id name)
-      (rec name)))
-
+  (or/c var? (cons/c exact-integer? exact-integer?)))
 
 ;; This table maps a type to an identifier bound to the type.
 ;; This allows us to avoid reconstructing the type when using

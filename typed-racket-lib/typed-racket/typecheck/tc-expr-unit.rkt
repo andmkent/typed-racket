@@ -8,7 +8,7 @@
          (types utils abbrev subtype type-table path-type
                 prop-ops overlap resolve generalize tc-result)
          (private-in syntax-properties parse-type)
-         (rep type-rep prop-rep object-rep)
+         (rep type-rep prop-rep object-rep var)
          (only-in (infer infer) intersect)
          (utils tc-utils)
          (env lexical-env scoped-tvar-env)
@@ -42,16 +42,16 @@
 (define/cond-contract (tc-id id)
   (--> identifier? full-tc-results/c)
   (define rename-id (contract-rename-id-property id))
-  (define id* (or rename-id id))
+  (define v (var (or rename-id id)))
   ;; see if id* is an alias for an object
   ;; if not (-id-path id*) is returned
-  (define obj (lookup-alias/lexical id*))
-  (define-values (alias-path alias-id)
+  (define obj (lookup-var-alias v))
+  (define-values (alias-path alias-var)
     (match obj
       [(Path: p x) (values p x)]
-      [(Empty:) (values (list) id*)]))
+      [(Empty:) (values (list) v)]))
   ;; calculate the type, resolving aliasing and paths if necessary
-  (define ty (or (path-type alias-path (lookup-type/lexical alias-id))
+  (define ty (or (path-type alias-path (lookup-var-type alias-var))
                  Univ))
  
   (ret ty
@@ -109,8 +109,8 @@
     [(tc-result1: t) t]
     [#f #f]))
 
-(define (explicit-fail stx msg var)
-  (cond [(and (identifier? var) (lookup-type/lexical var #:fail (λ _ #f)))
+(define (explicit-fail stx msg id)
+  (cond [(and (identifier? id) (lookup-var-type (var id) #:failure #f))
          =>
          (λ (t)
            (tc-error/expr #:stx stx

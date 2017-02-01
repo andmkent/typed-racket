@@ -1,8 +1,10 @@
 #lang racket/base
 
-(require typed-racket/utils/tc-utils)
+(require "../utils/utils.rkt"
+         (utils tc-utils)
+         (rep var))
 
-(provide make-typed-renaming un-rename)
+(provide make-typed-renaming un-rename un-rename-var)
 
 ;; a constructor for typed renamings that attach the required
 ;; 'not-free-identifier properties
@@ -33,8 +35,14 @@
 ;; The syntax-transforming check is for unit tests
 (define (un-rename id)
   (if (syntax-transforming?)
-      (let-values (((binding new-id) (syntax-local-value/immediate id (lambda () (values #f #f)))))
+      (let-values ([(binding new-id) (syntax-local-value/immediate id (λ () (values #f #f)))])
         (if (typed-renaming? binding)
             new-id
             id))
       id))
+
+(define (un-rename-var var)
+  (cond
+    [(var-id var)
+     => (λ (id) (var (un-rename id)))]
+    [else var]))

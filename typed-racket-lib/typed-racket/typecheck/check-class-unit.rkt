@@ -16,7 +16,7 @@
          (types utils abbrev subtype resolve generalize)
          (typecheck check-below internal-forms)
          (utils tc-utils mutated-vars)
-         (rep object-rep type-rep values-rep)
+         (rep object-rep type-rep values-rep var)
          (for-syntax racket/base)
          (for-template racket/base
                        (submod "internal-forms.rkt" forms)
@@ -574,16 +574,15 @@
         ;; Avoid counting the local table, which has dummy mutations that the
         ;; typed class macro inserted only for analysis.
         #:when (not (tr:class:local-table-property stx)))
-    (find-mutated-vars stx
-                       mvar-env
-                       (syntax-parser
-                        [(~var f (field-assignment local-private-field-table))
-                         (list #'f.sub #'f.name)]
-                        [_ #f])))
+    (find-mutated-vars! stx
+                        #:pred (syntax-parser
+                                 [(~var f (field-assignment local-private-field-table))
+                                  (list #'f.sub #'f.name)]
+                                 [_ #f])))
 
   ;; start type-checking elements in the body
-  (define-values (lexical-names lexical-types
-                  lexical-names/top-level lexical-types/top-level)
+  (define-values (lexical-vars lexical-types
+                  lexical-vars/top-level lexical-types/top-level)
     (local-tables->lexical-env parse-info
                                internal-external-mapping
                                local-method-table methods
@@ -602,7 +601,7 @@
   (do-timestamp "built local tables")
   
   (with-extended-lexical-env
-    [#:identifiers lexical-names/top-level
+    [#:vars lexical-vars/top-level
      #:types lexical-types/top-level]
     (check-super-new super-new super-inits super-init-rest)
     (do-timestamp "checked super-new")
@@ -616,7 +615,7 @@
 
   (define-values (checked-method-types checked-augment-types)
     (with-extended-lexical-env
-      [#:identifiers lexical-names
+      [#:vars lexical-vars
        #:types lexical-types]
       (define checked-method-types
         (check-methods (append (hash-ref parse-info 'pubment-names)
@@ -959,16 +958,17 @@
                             inherit-field-set-types
                             super-call-types
                             pubment-types augment-types inner-types))
-  (values all-names all-types
-          (append all-names
-                  localized-init-names
-                  localized-init-rest-name
-                  ;; Set `self` to the self-type and `init-args`
-                  ;; to Any, so that accessors can use them without
-                  ;; problems.
-                  ;; Be careful though!
-                  (list (hash-ref parse-info 'initializer-self-id)
-                        (hash-ref parse-info 'initializer-args-id)))
+  (values (map var all-names)
+          all-types
+          (map var (append all-names
+                           localized-init-names
+                           localized-init-rest-name
+                           ;; Set `self` to the self-type and `init-args`
+                           ;; to Any, so that accessors can use them without
+                           ;; problems.
+                           ;; Be careful though!
+                           (list (hash-ref parse-info 'initializer-self-id)
+                                 (hash-ref parse-info 'initializer-args-id))))
           (append all-types
                   init-types
                   init-rest-type
@@ -1115,17 +1115,17 @@
        ;; earlier had to do this, but it needs to be re-checked in this context
        ;; so that it has the right environment. An earlier approach did
        ;; check this only in the synthesis stage, but caused some regressions.
-       (define temp-names (syntax->list #'(names ...)))
+       (define temp-vars (map var (syntax->list #'(names ...))))
        (define init-types
          (match (tc-expr #'val-expr)
            [(tc-results: xs ) xs]))
-       (unless (= (length temp-names) (length init-types))
+       (unless (= (length temp-vars) (length init-types))
          (tc-error/expr "wrong number of values: expected ~a but got ~a"
-                        (length temp-names) (length init-types)))
+                        (length temp-vars) (length init-types)))
        ;; Extend lexical type env with temporaries introduced in the
        ;; expansion of the field initialization or setter
        (with-extended-lexical-env
-         [#:identifiers temp-names
+         [#:vars temp-vars
           #:types init-types]
          (check-field-set!s #'(begins ...) synthed-stxs inits))]
       [_ (void)])))
@@ -1134,7 +1134,7 @@
 ;; Determine the field type based on its private setter name
 ;; (assumption: the type environment maps this name already)
 (define (setter->type id)
-  (define f-type (lookup-type/lexical id))
+  (define f-type (lookup-var-type (var id)))
   (match f-type
     [(Function: (list (arr: (list _ type) _ _ _ _)))
      type]

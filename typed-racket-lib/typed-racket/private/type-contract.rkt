@@ -88,7 +88,7 @@
     [(define-values (n) _)
      (define typ
        (cond [maker?
-              (match (lookup-type-name (Name-id *typ))
+              (match (lookup-type-name (Name-var *typ))
                 [(Poly-names: names body)
                  (make-Poly names
                    ((map fld-t (Struct-flds body)) #f . t:->* . *typ))]

@@ -3,98 +3,96 @@
 ;; Environment for type names
 
 (require "../utils/utils.rkt"
-         "env-utils.rkt")
-
-(require syntax/id-table
          (contract-req)
          (env type-alias-env)
          (utils tc-utils)
-         (rep type-rep free-variance)
-         (types utils))
+         (rep type-rep free-variance var)
+         (types utils)
+         data/ddict)
 
 (provide/cond-contract [register-type-name
-                        (->* (identifier?) (Type?) any)]
+                        (->* (var?) (Type?) any)]
                        [register-type-names
-                        (-> (listof identifier?) (listof Type?) any)]
-                       [add-alias (-> identifier? identifier? any)]
+                        (-> (listof var?) (listof Type?) any)]
+                       [add-alias (-> var? var? any)]
                        [type-name-env-map
-                        (-> (-> identifier? (or/c #t Type?) any) any)]
+                        (-> (-> var? (or/c #t Type?) any) any)]
                        [type-variance-env-map
-                        (-> (-> identifier? (listof variance?) any) any)]
+                        (-> (-> var? (listof variance?) any) any)]
                        [type-name-env-for-each
-                        (-> (-> identifier? (or/c #t Type?) any) void?)]
+                        (-> (-> var? (or/c #t Type?) any) void?)]
                        [type-variance-env-for-each
-                        (-> (-> identifier? (listof variance?) any) void?)]
+                        (-> (-> var? (listof variance?) any) void?)]
                        [lookup-type-name
-                        (->* (identifier?) (procedure?) (or/c #t Type?))]
+                        (->* (var?) (procedure?) (or/c #t Type?))]
                        [register-type-variance!
-                        (-> identifier? (listof variance?) any)]
+                        (-> var? (listof variance?) any)]
                        [lookup-type-variance
-                        (-> identifier? (listof variance?))]
+                        (-> var? (listof variance?))]
                        [add-constant-variance!
-                        (-> identifier? (or/c #f (listof identifier?)) any)]
+                        (-> var? (or/c #f (listof var?)) any)]
                        [refine-variance!
-                        (-> (listof identifier?)
+                        (-> (listof var?)
                             (listof Type?)
                             (listof (or/c #f (listof symbol?)))
                             any)])
 
 ;; a mapping from id -> type (where id is the name of the type)
-(define the-mapping
-  (make-free-id-table))
+(define the-mapping (mutable-ddict))
 
 ;; add a name to the mapping
-(define (register-type-name id [type #t])
-  (free-id-table-set! the-mapping id type))
+(define (register-type-name var [type #t])
+  (ddict-set! the-mapping var type))
 
 ;; add a bunch of names to the mapping
-(define (register-type-names ids types)
-  (for-each register-type-name ids types))
+(define (register-type-names vars types)
+  (for-each register-type-name vars types))
 
 ;; given an identifier, return the type associated with it
 ;; optional argument is failure continuation - default calls lookup-fail
 ;; identifier (-> error) -> type
-(define (lookup-type-name id [k (lambda () (lookup-type-fail id))])
+(define (lookup-type-name var [k (λ () (lookup-type-fail var))])
   (begin0
-    (free-id-table-ref the-mapping id k)
-    (add-disappeared-use id)))
+    (ddict-ref the-mapping var k)
+    (add-disappeared-use var)))
 
 
 ;; map over the-mapping, producing a list
 ;; (id type -> T) -> listof[T]
 (define (type-name-env-map f)
-  (sorted-dict-map the-mapping f id<))
+  (ddict-map the-mapping f))
 
 (define (type-name-env-for-each f)
-  (sorted-dict-for-each the-mapping f id<))
+  (ddict-for-each the-mapping f))
 
-(define (add-alias from to)
-  (when (lookup-type-name to (lambda () #f))
+(define (add-alias from-var to-var)
+  (when (lookup-type-name to-var (λ () #f))
     (register-resolved-type-alias
-     from
-     (make-Name to 0 #t))))
+     from-var
+     (make-Name to-var 0 #t))))
 
 
 ;; a mapping from id -> listof[Variance] (where id is the name of the type)
-(define variance-mapping
-  (make-free-id-table))
+(define variance-mapping (mutable-ddict))
 
 ;; add a name to the mapping
 (define (register-type-variance! id variance)
-  (free-id-table-set! variance-mapping id variance))
+  (ddict-set! variance-mapping id variance))
 
 (define (lookup-type-variance id)
-  (free-id-table-ref
+  (ddict-ref
    variance-mapping id
-   (lambda () (lookup-variance-fail id))))
+   (λ () (lookup-variance-fail id))))
 
 ;; map over the-mapping, producing a list
 ;; (id variance -> T) -> listof[T]
 (define (type-variance-env-map f)
-  (sorted-dict-map variance-mapping f id<))
+  (for/list ([(k v) (in-ddict variance-mapping)])
+    (f k v)))
 
 (define (type-variance-env-for-each f)
-  (sorted-dict-for-each variance-mapping f id<))
+  (for ([(k v) (in-ddict variance-mapping)])
+    (f k v)))
 
 ;; Refines the variance of a type in the name environment
 (define (refine-variance! names types tvarss)

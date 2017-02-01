@@ -5,7 +5,7 @@
          racket/match syntax/id-table racket/set
          racket/sequence
          (contract-req)
-         (rep type-rep object-rep rep-utils)
+         (rep type-rep object-rep rep-utils var)
          (rename-in (types abbrev utils)
                     [-> t:->]
                     [->* t:->*]
@@ -66,9 +66,9 @@
        (#:rest (or/c #f (list/c identifier? (or/c Type? (cons/c Type? symbol?))))
         #:expected (or/c #f tc-results/c))
        arr?)
-  (define-values (rest-id rest)
+  (define-values (rest-var rest)
     (if raw-rest
-        (values (first raw-rest) (second raw-rest))
+        (values (var (first raw-rest)) (second raw-rest))
         (values #f #f)))
 
   (define rest-types
@@ -76,19 +76,20 @@
       [(not rest) (list)]
       [(cons? rest) (list (make-ListDots (car rest) (cdr rest)))]
       [else (list (-lst rest))]))
-  (define rest-names
-    (if rest-id (list rest-id) null))
+  (define rest-vars
+    (if rest-var (list rest-var) null))
 
-  (make-arr*
-   arg-types
-   (abstract-results
-    (with-extended-lexical-env
-      [#:identifiers (append rest-names arg-names)
-       #:types (append rest-types arg-types)]
-      (tc-body/check body expected))
-    arg-names #:rest-id rest-id)
-   #:rest (and (Type? rest) rest)
-   #:drest (and (cons? rest) rest)))
+  (let ([arg-vars (map var arg-names)])
+    (make-arr*
+     arg-types
+     (abstract-results
+      (with-extended-lexical-env
+          [#:vars (append rest-vars arg-vars)
+           #:types (append rest-types arg-types)]
+        (tc-body/check body expected))
+      arg-vars #:rest-var rest-var)
+     #:rest (and (Type? rest) rest)
+     #:drest (and (cons? rest) rest))))
 
 ;; check-clause: Checks that a lambda clause has arguments and body matching the expected type
 ;; arg-list: The identifiers of the positional args in the lambda form
@@ -282,8 +283,7 @@
 
 ;; Currently no support for objects representing the rest argument
 (define (formals->objects formals)
-  (for/list ([i (in-list (formals-positional formals))])
-    (make-Path null i)))
+  (map -id-path (formals-positional formals)))
 
 
 ;; An arity is a list (List Natural Boolean), with the number of positional
@@ -546,11 +546,13 @@
 (define (tc/rec-lambda/check formals* body name args return)
   (define formals (syntax->list formals*))
   (define ft (t:->* args (tc-results->values return)))
-  (define names (cons name formals))
-  (define objs (map (λ (_) -empty-obj) names))
+  (define-values (vars objs)
+    (for/lists (_1 _2)
+      ([name (in-list (cons name formals))])
+      (values (var name) -empty-obj)))
   (with-extended-lexical-env
-    [#:identifiers (cons name formals)
+    [#:vars vars
      #:types (cons ft args)]
     (values
-     (replace-names names objs (ret ft))
-     (replace-names names objs (tc-body/check body return)))))
+     (replace-vars vars objs (ret ft))
+     (replace-vars vars objs (tc-body/check body return)))))

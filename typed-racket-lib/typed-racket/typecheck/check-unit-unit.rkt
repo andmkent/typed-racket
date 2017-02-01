@@ -74,7 +74,7 @@
          (types utils abbrev subtype resolve generalize signatures)
          (typecheck check-below internal-forms)
          (utils tc-utils)
-         (rep type-rep values-rep)
+         (rep type-rep values-rep var)
          (for-syntax racket/base racket/unit-exptime syntax/parse)
          (for-template racket/base
                        racket/unsafe/undefined
@@ -488,7 +488,7 @@
        (define types (map cdr (Signature-mapping sig)))
        (for ([type (in-list types)]
              [id (in-list ids)])
-         (define lexical-type (lookup-type/lexical id))
+         (define lexical-type (lookup-var-type (var id)))
          (unless (subtype lexical-type type)
            (tc-error/fields "type mismatch in unit-from-context export"
                             "expected" type
@@ -597,7 +597,7 @@
        (define types (map cdr (Signature-mapping sig)))
        (for ([type (in-list types)]
              [id (in-list ids)])
-         (define lexical-type (lookup-type/lexical id))
+         (define lexical-type (lookup-var-type (var id)))
          (unless (subtype lexical-type type)
            (tc-error/fields "type mismatch in invoke-unit import"
                             "expected" type
@@ -663,7 +663,7 @@
               [sig (in-value (car sig-mapping))]
               [mapping (in-value (cdr sig-mapping))]
               [(id expected-type) (in-dict mapping)])
-         (define id-lexical-type (lookup-type/lexical id))
+         (define id-lexical-type (lookup-var-type (var id)))
          (unless (subtype id-lexical-type expected-type)
            (tc-error/fields "type mismatch in unit export"
                             "expected" expected-type
@@ -718,12 +718,12 @@
      (define-values (ann/def-names ann/def-exprs)
        (process-ann/def-for-letrec annotation/definition-forms))
 
-     (define-values (sig-ids sig-types)
+     (define-values (sig-vars sig-types)
        (for/lists (_1 _2) ([(k v) (in-dict local-sig-type-map)])
-         (values k (-> v))))
+         (values (var k) (-> v))))
      (define unit-type
        (with-extended-lexical-env
-         [#:identifiers sig-ids
+         [#:vars sig-vars
           #:types sig-types]
          ;; Typechecking a unit body is structurally similar to that of
          ;; checking a let-body, so we resuse the machinary for checking

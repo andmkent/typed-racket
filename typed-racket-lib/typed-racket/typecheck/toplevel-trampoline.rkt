@@ -87,7 +87,7 @@
           (define fully-expanded
             ;; a non-begin form can still cause lifts, so still have to catch them
             (disarm* (local-expand/capture* #'e 'top-level (list #'module*))))
-          (find-mutated-vars fully-expanded mvar-env)
+          (find-mutated-vars! fully-expanded)
           ;; Unlike the `begin` cases, we probably don't need to trampoline back
           ;; to the top-level because we're not catching lifts from macros at the
           ;; top-level context but instead from expression context.

@@ -1,7 +1,7 @@
 #lang racket/base
 (require "../utils/utils.rkt")
 
-(require (rep type-rep rep-utils)
+(require (rep type-rep rep-utils var)
          (env type-name-env)
          (utils tc-utils)
          (types utils current-seen)
@@ -75,7 +75,8 @@
                        "\n  given: " (length rands)
                        "\n  arguments...: " rands)))]
       [(Name/struct: n) #:when (and (current-poly-struct)
-                                    (free-identifier=? n (poly-name (current-poly-struct))))
+                                    (var-id n)
+                                    (free-identifier=? (var-id n) (poly-name (current-poly-struct))))
        (define poly-num (length (poly-vars (current-poly-struct))))
        (if (= poly-num (length rands))
            (when (not (or (ormap Error? rands)

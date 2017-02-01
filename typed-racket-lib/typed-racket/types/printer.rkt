@@ -8,7 +8,7 @@
          racket/list
          racket/set
          (path-up "rep/type-rep.rkt" "rep/prop-rep.rkt" "rep/object-rep.rkt"
-                  "rep/core-rep.rkt" "rep/values-rep.rkt"
+                  "rep/core-rep.rkt" "rep/values-rep.rkt" "rep/var.rkt"
                   "rep/rep-utils.rkt" "types/subtype.rkt" "types/overlap.rkt"
                   "types/match-expanders.rkt"
                   "types/kw-types.rkt"
@@ -120,6 +120,9 @@
 
 (define name-ref->sexp
   (match-lambda
+    [(or (? syntax? name-ref)
+         (var: (? syntax? name-ref)))
+     (syntax-e name-ref)]
     [(? syntax? name-ref) (syntax-e name-ref)]
     [(cons lvl arg) `(,lvl ,arg)]))
 
@@ -447,7 +450,7 @@
     [(Univ:) 'Any]
     [(Bottom:) 'Nothing]
     ;; struct names are just printed as the original syntax
-    [(Name/struct: id) (syntax-e id)]
+    [(Name/struct: (var: id)) (syntax-e id)]
     ;; If a type has a name, then print it with that name.
     ;; However, we expand the alias in some cases
     ;; (i.e., the fuel is > 0) for the :type form.
@@ -472,11 +475,13 @@
     ;; values like characters (when `display`ed)
     [(Val-able: v) (format "~v" v)]
     [(? Base?) (Base-name type)]
-    [(StructType: (Struct: nm _ _ _ _ _)) `(StructType ,(syntax-e nm))]
+    [(StructType: (Struct: (var: nm) _ _ _ _ _))
+     `(StructType ,(syntax-e nm))]
     ;; this case occurs if the contained type is a type variable
     [(StructType: ty) `(Struct-Type ,(t->s ty))]
     [(StructTypeTop:) 'Struct-TypeTop]
-    [(StructTop: (Struct: nm _ _ _ _ _)) `(Struct ,(syntax-e nm))]
+    [(StructTop: (Struct: (var: nm) _ _ _ _ _))
+     `(Struct ,(syntax-e nm))]
     [(Prefab: key field-types)
      `(Prefab ,(abbreviate-prefab-key key)
               ,@(map t->s field-types))]
@@ -503,7 +508,7 @@
     [(? tuple? t)
      `(List ,@(map type->sexp (tuple-elems t)))]
     [(Opaque: pred) `(Opaque ,(syntax->datum pred))]
-    [(Struct: nm       par (list (fld: t _ _) ...)       proc _ _)
+    [(Struct: (var: nm) par (list (fld: t _ _) ...) proc _ _)
      `#(,(string->symbol (format "struct:~a" (syntax-e nm)))
         ,(map t->s t)
         ,@(if proc (list (t->s proc)) null))]
@@ -593,7 +598,7 @@
        ,(values->sexp body))]
     [(UnitTop:) 'UnitTop]
     [(MPair: s t) `(MPairof ,(t->s s) ,(t->s t))]
-    [(Refinement: parent p?)
+    [(Refinement: parent (var: p?))
      `(Refinement ,(t->s parent) ,(syntax-e p?))]
     [(Sequence: ts)
      `(Sequenceof ,@(map t->s ts))]

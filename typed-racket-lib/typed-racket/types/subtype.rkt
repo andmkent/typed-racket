@@ -5,7 +5,7 @@
          (contract-req)
          (rep type-rep prop-rep object-rep
               core-rep type-mask values-rep rep-utils
-              free-variance rep-switch)
+              free-variance rep-switch var)
          (utils tc-utils)
          (types utils resolve match-expanders current-seen
                 numeric-tower substitute prefab signatures)
@@ -294,15 +294,15 @@
 
 (define (unrelated-structs s1 s2)
   (define (in-hierarchy? s par)
-    (define s-name
+    (define s-name-var
       (match s
         [(Poly: _ (Struct: s-name _ _ _ _ _)) s-name]
         [(Struct: s-name _ _ _ _ _) s-name]))
-    (define p-name
+    (define p-name-var
       (match par
         [(Poly: _ (Struct: p-name _ _ _ _ _)) p-name]
         [(Struct: p-name _ _ _ _ _) p-name]))
-    (or (free-identifier=? s-name p-name)
+    (or (var=? s-name-var p-name-var)
         (match s
           [(Poly: _ (? Struct? s*)) (in-hierarchy? s* par)]
           [(Struct: _ (and (Name/struct:) p) _ _ _ _)
@@ -880,10 +880,10 @@
                    (type≡? body1 body2)
                    (type≡? handler1 handler2))]
      [_ (continue A t1 t2)])]
-  [(case: Refinement (Refinement: t1-parent id1))
+  [(case: Refinement (Refinement: t1-parent var1))
    (match t2
-     [(Refinement: t2-parent id2)
-      #:when (free-identifier=? id1 id2)
+     [(Refinement: t2-parent var2)
+      #:when (var=? var1 var2)
       (subtype* A t1-parent t2-parent)]
      [_ (cond
           [(subtype* A t1-parent t2)]
@@ -898,7 +898,7 @@
      [(Set: elem2) (subtype* A elem1 elem2)]
      [(Sequence: (list seq-t)) (subtype* A elem1 seq-t)]
      [_ (continue A t1 t2)])]
-  [(case: Struct (Struct: nm1 parent1 flds1 proc1 _ _))
+  [(case: Struct (Struct: var1 parent1 flds1 proc1 _ _))
    (match t2
      ;; Avoid resolving things that refer to different structs.
      ;; Saves us from non-termination
@@ -906,16 +906,16 @@
       #:when (unrelated-structs t1 t2)
       #f]
      ;; subtyping on immutable structs is covariant
-     [(Struct: nm2 _ flds2 proc2 _ _)
-      #:when (free-identifier=? nm1 nm2)
+     [(Struct: var2 _ flds2 proc2 _ _)
+      #:when (var=? var1 var2)
       (let ([A (remember t1 t2 A)])
         (with-updated-seen A
           (let ([A (cond [(and proc1 proc2) (subtype* A proc1 proc2)]
                          [proc2 #f]
                          [else A])])
             (and A (subtype/flds* A flds1 flds2)))))]
-     [(StructTop: (Struct: nm2 _ _ _ _ _))
-      #:when (free-identifier=? nm1 nm2)
+     [(StructTop: (Struct: var2 _ _ _ _ _))
+      #:when (var=? var1 var2)
       A]
      [(Val-able: (? (negate struct?) _)) #f]
      ;; subtyping on structs follows the declared hierarchy

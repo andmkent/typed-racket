@@ -8,7 +8,7 @@
          (env lexical-env)
          (typecheck signatures tc-funapp tc-metafunctions)
          (types base-abbrev resolve utils type-table)
-         (rep type-rep)
+         (rep type-rep var)
          (utils tc-utils)
          (for-template racket/base))
 
@@ -57,13 +57,13 @@
 ;;                    -> TC-Result
 ;; Handles typechecking the actual application inside the method send
 ;; expansion. Most of the work is done by tc/app via tc-expr.
-(define (tc/send-internal vars types app-stx expected)
+(define (tc/send-internal ids types app-stx expected)
   (syntax-parse app-stx
     #:literal-sets (kernel-literals)
     #:literals (list)
     [(#%plain-app meth obj arg ...)
      (with-extended-lexical-env
-       [#:identifiers vars
+       [#:vars (map var ids)
         #:types types]
        (tc-expr/check (syntax/loc app-stx (#%plain-app meth arg ...))
                       expected))]
@@ -72,7 +72,7 @@
                                     kws2 kw-args
                                     obj pos-arg ...)))
      (with-extended-lexical-env
-       [#:identifiers vars
+       [#:vars (map var ids)
         #:types types]
        (tc-expr/check
         (with-syntax* ([inner-app (syntax/loc app-stx (#%plain-app cpce s-kp meth kpe kws num))]

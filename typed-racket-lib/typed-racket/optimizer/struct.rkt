@@ -5,6 +5,7 @@
          "../utils/utils.rkt"
          (utils tc-utils)
          (types struct-table)
+         (rep var)
          (optimizer utils logging))
 
 (provide struct-opt-expr)
@@ -14,14 +15,14 @@
 (define-syntax-class struct-op
   #:attributes (message opt idx)
   (pattern op:id
-    #:when (struct-accessor? #'op)
+    #:when (struct-accessor? (var #'op))
     #:attr message "struct ref"
-    #:with idx #`'#,(struct-fn-idx #'op)
+    #:with idx #`'#,(struct-fn-idx (var #'op))
     #:with opt #'unsafe-struct-ref)
   (pattern op:id
-    #:when (struct-mutator? #'op)
+    #:when (struct-mutator? (var #'op))
     #:attr message "struct set"
-    #:with idx #`'#,(struct-fn-idx #'op)
+    #:with idx #`'#,(struct-fn-idx (var #'op))
     #:with opt #'unsafe-struct-set!))
 
 (define-syntax-class struct-opt-expr

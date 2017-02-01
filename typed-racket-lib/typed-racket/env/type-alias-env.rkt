@@ -1,28 +1,29 @@
 #lang racket/base
 
 (require "../utils/utils.rkt"
-         "env-utils.rkt"
-         syntax/id-table
+         (contract-req)
          (utils tc-utils)
          (typecheck renamer)
-         racket/match)
+         (rep core-rep var)
+         racket/match
+         data/ddict)
 
-(provide register-type-alias
-         lookup-type-alias
-         resolve-type-aliases
-         register-resolved-type-alias
-         type-alias-env-map
-         type-alias-env-for-each)
+(provide/cond-contract
+ [register-type-alias (-> var? syntax? void?)]
+ [lookup-type-alias (->* (var? procedure?) (#:failure any/c) any)]
+ [resolve-type-aliases! (-> procedure? void?)]
+ [register-resolved-type-alias (-> var? Type? void?)]
+ [type-alias-env-map (-> procedure? list?)]
+ [type-alias-env-for-each (-> procedure? void?)])
 
-(define-struct alias-def () #:inspector #f)
-(define-struct (unresolved alias-def) (stx [in-process #:mutable]) #:inspector #f)
-(define-struct (resolved alias-def) (ty) #:inspector #f)
+(struct alias-def () #:transparent)
+(struct unresolved alias-def (stx [in-process #:mutable]) #:transparent)
+(struct resolved alias-def (ty) #:transparent)
 
 ;; a mapping from id -> alias-def (where id is the name of the type)
-(define the-mapping
-  (make-free-id-table))
+(define the-mapping (mutable-ddict))
 
-(define (mapping-put! id v) (free-id-table-set! the-mapping id v))
+(define (mapping-put! id v) (ddict-set! the-mapping id v))
 
 ;(trace mapping-put!)
 
@@ -30,44 +31,45 @@
 ;; identifier type-stx -> void
 (define (register-type-alias id stx)
   ;(printf "registering type ~a\n~a\n" (syntax-e id) id)
-  (mapping-put! id (make-unresolved stx #f)))
+  (mapping-put! id (unresolved stx #f)))
 
-(define (register-resolved-type-alias id ty)
-  (mapping-put! id (make-resolved ty)))
+(define (register-resolved-type-alias var ty)
+  (mapping-put! var (resolved ty)))
 
-(define (lookup-type-alias id parse-type [k (lambda () (tc-error "Unknown type alias: ~a" (syntax-e id)))])
-  (match (or (free-id-table-ref the-mapping id #f)
-             (free-id-table-ref the-mapping (un-rename id) #f))
-    [#f (k)]
-    [(struct unresolved (stx #f))
-     (resolve-type-alias id parse-type)]
-    [(struct unresolved (stx #t))
-     (tc-error/stx stx "Recursive Type Alias Reference")]
-    [(struct resolved (t)) t]))
+(define (lookup-type-alias var parse-type
+                           #:failure [fail (λ () (tc-error "Unknown type alias: ~a"
+                                                           (or (and (var-id var)
+                                                                    (syntax-e (var-id var)))
+                                                               "?")))])
+  (match (or (ddict-ref the-mapping var #f)
+             (ddict-ref the-mapping (un-rename-var var) #f))
+    [#f (if (procedure? fail) (fail) fail)]
+    [(unresolved stx #f) (resolve-type-alias var parse-type)]
+    [(unresolved stx #t) (tc-error/stx stx "Recursive Type Alias Reference")]
+    [(resolved t) t]))
 
-(define (resolve-type-alias id parse-type)
-  (define v (free-id-table-ref the-mapping id))
+(define (resolve-type-alias var parse-type)
+  (define v (ddict-ref the-mapping var))
   (match v
-    [(struct unresolved (stx _))
+    [(unresolved stx _)
      (set-unresolved-in-process! v #t)
      (let ([t (parse-type stx)])
-       (mapping-put! id (make-resolved t))
+       (mapping-put! var (resolved t))
        t)]
-    [(struct resolved (t))
-     t]))
+    [(resolved t) t]))
 
-(define (resolve-type-aliases parse-type)
-  (for ([id (in-list (free-id-table-keys the-mapping))])
+(define (resolve-type-aliases! parse-type)
+  (for ([id (in-ddict-keys the-mapping)])
     (resolve-type-alias id parse-type)))
 
 ;; map over the-mapping, producing a list
 ;; (id type -> T) -> listof[T]
 (define (type-alias-env-map f)  
-  (for/list ([(id t) (in-sorted-dict the-mapping id<)]
+  (for/list ([(var t) (in-ddict the-mapping)]
              #:when (resolved? t))
-    (f id (resolved-ty t))))
+    (f var (resolved-ty t))))
 
 (define (type-alias-env-for-each f)  
-  (for ([(id t) (in-sorted-dict the-mapping id<)]
+  (for ([(var t) (in-ddict the-mapping)]
         #:when (resolved? t))
-    (f id (resolved-ty t))))
+    (f var (resolved-ty t))))

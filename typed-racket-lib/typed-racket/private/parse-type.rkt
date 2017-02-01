@@ -3,7 +3,7 @@
 ;; This module provides functions for parsing types written by the user
 
 (require (rename-in "../utils/utils.rkt" [infer infer-in])
-         (except-in (rep core-rep type-rep object-rep) make-arr)
+         (except-in (rep core-rep type-rep object-rep var) make-arr)
          (rename-in (types abbrev utils prop-ops resolve
                            classes prefab signatures)
                     [make-arr* make-arr])
@@ -45,7 +45,7 @@
          current-referenced-class-parents
          current-type-alias-name)
 
-;; current-type-alias-name : Parameter<(Option Id)>
+;; current-type-alias-name : Parameter<(Option var)>
 ;; This parameter stores the name of the type alias that is
 ;; being parsed (set in type-alias-helper.rkt), #f if the
 ;; parsing is not for a type alias
@@ -352,7 +352,7 @@
       [(:Object^ e ...)
        (parse-object-type stx)]
       [(:Refinement^ p?:id)
-       (match (lookup-type/lexical #'p?)
+       (match (lookup-var-type (var #'p?))
          [(and t (Function: (list (arr: (list dom) _ #f #f '()))))
           (make-Refinement dom #'p?)]
          [t (parse-error "expected a predicate for argument to Refinement"
@@ -606,12 +606,12 @@
           (parse-error "type variable must be used with ..."
                        "variable" (syntax-e #'id))]
          ;; if it's a type alias, we expand it (the expanded type is stored in the HT)
-         [(lookup-type-alias #'id parse-type (lambda () #f))
+         [(lookup-type-alias (var #'id) parse-type #:failure (λ () #f))
           =>
-          (lambda (t)
+          (λ (t)
             (when (current-referenced-aliases)
               (define alias-box (current-referenced-aliases))
-              (set-box! alias-box (cons #'id (unbox alias-box))))
+              (set-box! alias-box (cons (var #'id) (unbox alias-box))))
             (and (syntax-transforming?)
                  (add-disappeared-use (syntax-local-introduce #'id)))
             t)]

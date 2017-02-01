@@ -4,6 +4,7 @@
          syntax/kerncase
          syntax/stx
          racket/pretty racket/promise racket/lazy-require
+         (rep var)
          (env type-name-env type-alias-env mvar-env)
          (utils tc-utils disarm mutated-vars lift)
          "standard-inits.rkt"
@@ -32,9 +33,9 @@
   (lazy
    (append
     (type-name-env-map (lambda (id ty)
-                         (cons (syntax-e id) ty)))
+                         (cons (syntax-e (var-id id)) ty)))
     (type-alias-env-map (lambda (id ty)
-                          (cons (syntax-e id) ty))))))
+                          (cons (syntax-e (var-id id)) ty))))))
 
 (define-logger online-check-syntax)
 
@@ -68,7 +69,7 @@
       ;; expansion errors to happen with out paying that cost
       (do-standard-inits)
       (do-time "Initialized Envs")
-      (find-mutated-vars expanded-stx mvar-env)
+      (find-mutated-vars! expanded-stx)
       (k expanded-stx))))
 
 ;; for top-level use

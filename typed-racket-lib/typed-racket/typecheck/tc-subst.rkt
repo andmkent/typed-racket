@@ -12,20 +12,21 @@
          (only-in (infer infer) intersect restrict)
          (types subtype)
          (rep core-rep type-rep object-rep
-              prop-rep rep-utils values-rep))
+              prop-rep rep-utils values-rep
+              var))
 
 (provide/cond-contract
  [restrict-values (-> SomeValues? (listof Type?) SomeValues?)]
  [values->tc-results (->* (SomeValues? (listof OptObject?))
                           ((listof Type?))
                           full-tc-results/c)]
- [replace-names (-> (listof identifier?)
-                    (listof OptObject?)
-                    tc-results/c
-                    tc-results/c)]
- [erase-names (-> (listof identifier?)
-                  tc-results/c
-                  tc-results/c)])
+ [replace-vars (-> (listof var?)
+                   (listof OptObject?)
+                   tc-results/c
+                   tc-results/c)]
+ [erase-vars (-> (listof var?)
+                 tc-results/c
+                 tc-results/c)])
 
 (provide subst-rep)
 
@@ -65,16 +66,16 @@
 ;; For each name replaces all uses of it in res with the
 ;; corresponding object.  This is used so that names do not escape the
 ;; scope of their definitions
-(define (replace-names names objects res)
+(define (replace-vars vars objects res)
   (define targets
-    (for/list ([nm (in-list names)]
+    (for/list ([nm (in-list vars)]
                [o (in-list objects)])
       (list nm o Univ)))
   (subst-tc-results res targets))
 
-(define (erase-names names res)
+(define (erase-vars vars res)
   (define targets
-    (for/list ([nm (in-list names)])
+    (for/list ([nm (in-list vars)])
       (list nm -empty-obj Univ)))
   (subst-tc-results res targets))
 
@@ -100,7 +101,7 @@
     (match r-o
       [(Path: flds nm)
        (cond
-         [(assoc nm targets name-ref=?) =>
+         [(assoc nm targets) =>
           (match-lambda
             [(list _ _ t)
              (or (path-type flds t) Univ)])]
@@ -160,7 +161,7 @@
       [(Path: flds nm)
        (let ([flds (map subst flds)])
          (cond
-           [(assoc nm targets name-ref=?) =>
+           [(assoc nm targets) =>
             (λ (l) (match (second l)
                      [(Empty:) -empty-obj]
                      [(Path: flds* nm*)
@@ -170,7 +171,7 @@
       [(TypeProp: (Path: flds nm) ty-at-flds)
        (let ([flds (map subst flds)])
          (cond
-           [(assoc nm targets name-ref=?) =>
+           [(assoc nm targets) =>
             (match-lambda
               [(list _ new-obj new-obj-ty)
                (define arg-ty-at-flds (or (path-type flds new-obj-ty) Univ))
@@ -186,7 +187,7 @@
       [(NotTypeProp: (Path: flds nm) not-ty-at-flds)
        (let ([flds (map subst flds)])
          (cond
-           [(assoc nm targets name-ref=?) =>
+           [(assoc nm targets) =>
             (match-lambda
               [(list _ new-obj new-obj-ty)
                (define arg-ty-at-flds (or (path-type flds new-obj-ty) Univ))

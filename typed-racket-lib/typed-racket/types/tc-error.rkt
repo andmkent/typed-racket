@@ -1,7 +1,7 @@
 #lang racket/base
 
 (require "../utils/utils.rkt"
-         (rep type-rep)
+         (rep type-rep var)
          (utils tc-utils)
          (types tc-result)
          "base-abbrev.rkt"
@@ -37,39 +37,42 @@
 
 ;; error for unbound variables
 (define (lookup-fail e)
-  (match (identifier-binding e)
-    ['lexical (tc-error/expr/fields "missing type for identifier"
-                                    #:more "consider adding a type annotation with `:'"
-                                    "identifier" (syntax-e e)
-                                    #:return -Bottom)]
-    [#f (tc-error/expr/fields "missing type for top-level identifier"
-                              #:more "either undefined or missing a type annotation"
-                              "identifier" (syntax-e e)
-                              #:return -Bottom)]
-    [(list _ _ nominal-source-mod nominal-source-id _ _ _)
-     (define-values (mod-path base-path)
-       (module-path-index-split nominal-source-mod))
-     (cond [(and (not mod-path) (not base-path))
-            (tc-error/expr/fields "missing type for identifier"
-                                  #:more "consider adding a type annotation with `:'"
-                                  "identifier" (syntax-e e)
-                                  #:return -Bottom)]
-           [(equal? mod-path '(lib "typed/racket"))
-            (tc-error/expr/fields
-             "missing type for identifier"
-             #:more
-             (string-append "The `racket' language does not seem"
-                            " to have a type for this identifier;"
-                            " please file a bug report")
-             "identifier" (syntax-e e)
-             "from module" mod-path
-             #:return -Bottom)]
-           [else
-            (tc-error/expr/fields "missing type for identifier"
-                                  #:more "consider using `require/typed' to import it"
-                                  "identifier" (syntax-e e)
-                                  "from module" mod-path
-                                  #:return -Bottom)])]))
+  (cond
+    [(identifier? e)
+     (match (identifier-binding e)
+       ['lexical (tc-error/expr/fields "missing type for identifier"
+                                       #:more "consider adding a type annotation with `:'"
+                                       "identifier" (syntax-e e)
+                                       #:return -Bottom)]
+       [#f (tc-error/expr/fields "missing type for top-level identifier"
+                                 #:more "either undefined or missing a type annotation"
+                                 "identifier" (syntax-e e)
+                                 #:return -Bottom)]
+       [(list _ _ nominal-source-mod nominal-source-id _ _ _)
+        (define-values (mod-path base-path)
+          (module-path-index-split nominal-source-mod))
+        (cond [(and (not mod-path) (not base-path))
+               (tc-error/expr/fields "missing type for identifier"
+                                     #:more "consider adding a type annotation with `:'"
+                                     "identifier" (syntax-e e)
+                                     #:return -Bottom)]
+              [(equal? mod-path '(lib "typed/racket"))
+               (tc-error/expr/fields
+                "missing type for identifier"
+                #:more
+                (string-append "The `racket' language does not seem"
+                               " to have a type for this identifier;"
+                               " please file a bug report")
+                "identifier" (syntax-e e)
+                "from module" mod-path
+                #:return -Bottom)]
+              [else
+               (tc-error/expr/fields "missing type for identifier"
+                                     #:more "consider using `require/typed' to import it"
+                                     "identifier" (syntax-e e)
+                                     "from module" mod-path
+                                     #:return -Bottom)])])]
+    [else (lookup-fail (var-id e))]))
 
 (define (lookup-type-fail i)
   (tc-error/expr #:return -Bottom "~a is not bound as a type" (syntax-e i)))

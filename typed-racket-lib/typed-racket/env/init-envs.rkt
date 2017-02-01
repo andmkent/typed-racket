@@ -12,11 +12,12 @@
          (rep core-rep type-rep
               prop-rep rep-utils
               object-rep values-rep
-              free-variance)
+              free-variance var)
          (for-syntax syntax/parse racket/base)
          (types abbrev struct-table utils)
          data/queue
          racket/dict racket/list racket/promise
+         racket/set
          racket/match
          syntax/id-table)
 
@@ -37,10 +38,11 @@
          (provide initialize-env))]))
 
 (define (initialize-type-name-env initial-type-names)
-  (for-each (lambda (nm/ty) (register-resolved-type-alias (car nm/ty) (cadr nm/ty))) initial-type-names))
+  (for-each (λ (nm/ty) (register-resolved-type-alias (var (car nm/ty)) (cadr nm/ty))) initial-type-names))
 
 (define (initialize-type-env initial-env)
-  (for-each (lambda (nm/ty) (register-type-if-undefined (car nm/ty) (cadr nm/ty))) initial-env))
+  (for ([nm/ty (in-list initial-env)])
+    (register-type-if-undefined (var (car nm/ty)) (cadr nm/ty))))
 
 ;; stores definition syntaxes for lifting out common expressions
 (define type-definitions (make-queue))
@@ -358,16 +360,16 @@
     [(StructPE: ty idx)
      `(make-StructPE ,(type->sexp ty) ,idx)]))
 
-(define (bound-in-this-module id)
-  (let ([binding (identifier-binding id)])
+(define (bound-in-this-module id-var)
+  (let ([binding (identifier-binding (var-id id-var))])
     (if (and (list? binding) (module-path-index? (car binding)))
         (let-values ([(mp base) (module-path-index-split (car binding))])
           (not mp))
         #f)))
 
 (define (make-init-code map f)
-  (define (bound-f id v)
-    (and (bound-in-this-module id) (f id v)))
+  (define (bound-f id-var v)
+    (and (bound-in-this-module id-var) (f id-var v)))
   (define aliases (filter values (map bound-f)))
   #`(begin #,@aliases))
 
@@ -380,9 +382,10 @@
 ;; actually track types.
 (define (compute-all-popularities)
   (define (count-env for-each)
-    (define (count id ty) (compute-popularity ty))
-    (define (bound-f id v)
-      (and (bound-in-this-module id) (count id v)))
+    (define (count id-var ty) (compute-popularity ty))
+    (define (bound-f id-var rep)
+      (unless (var? id-var) (error 'bound-f "not a var! ~a" id-var))
+      (and (bound-in-this-module id-var) (count id-var rep)))
     (for-each bound-f))
 
   (count-env type-name-env-for-each)
@@ -393,27 +396,30 @@
 (define (tname-env-init-code)
   (make-init-code
     type-name-env-map
-    (λ (id ty) #`(register-type-name #'#,id #,(quote-type ty)))))
+    (λ (id-var ty) #`(register-type-name (var #'#,(var-id id-var))
+                                         #,(quote-type ty)))))
 
 (define (tvariance-env-init-code)
   (make-init-code
     type-variance-env-map
-    (λ (id var) #`(register-type-variance! #'#,id (list #,@(map variance->binding var))))))
+    (λ (id-var var) #`(register-type-variance! (var #'#,(var-id id-var))
+                                               (list #,@(map variance->binding var))))))
 
 (define (talias-env-init-code)
   (make-init-code
     type-alias-env-map
-    (λ (id ty) #`(register-resolved-type-alias #'#,id #,(quote-type ty)))))
+    (λ (id-var ty) #`(register-resolved-type-alias (var #'#,(var-id id-var))
+                                                   #,(quote-type ty)))))
 
 (define (env-init-code)
   (make-init-code
     type-env-map
-    (λ (id ty) #`(register-type #'#,id #,(quote-type ty)))))
+    (λ (id-var ty) #`(register-type (var #'#,(var-id id-var)) #,(quote-type ty)))))
 
 (define (mvar-env-init-code mvar-env)
   (make-init-code
-    (λ (f) (free-id-table-map mvar-env f))
-    (lambda (id v) (and v #`(register-mutated-var #'#,id)))))
+   (λ (f) (set-map mvar-env (λ (elem) (f elem #t))))
+   (λ (id-var v) (and v #`(register-mutated-var (var #'#,(var-id id-var)))))))
 
 ;; see 'finalize-signatures!' in 'env/signature-env.rkt',
 ;; which forces these delays after all the signatures are parsed
@@ -441,7 +447,7 @@
           (talias-env-init-code)
           (tname-env-init-code)
           (tvariance-env-init-code)
-          (mvar-env-init-code mvar-env)
+          (mvar-env-init-code mvars)
           (signature-env-init-code)
           (make-struct-table-code)))
 

@@ -1,13 +1,20 @@
 #lang racket/base
 
-(require syntax/id-table)
+(require "../utils/utils.rkt"
+         (rep var)
+         (contract-req)
+         racket/set)
 
-(provide mvar-env register-mutated-var is-var-mutated?)
+(provide mvars)
 
-(define mvar-env (make-free-id-table))
+(provide/cond-contract
+ [register-mutated-var (-> var? void?)]
+ [is-var-mutated? (-> var? boolean?)])
 
-(define (register-mutated-var id)
-  (free-id-table-set! mvar-env id #t))
+(define mvars (mutable-set))
 
-(define (is-var-mutated? id)
-  (free-id-table-ref mvar-env id #f))
+(define (register-mutated-var v)
+  (set-add! mvars v))
+
+(define (is-var-mutated? v)
+  (set-member? mvars v))

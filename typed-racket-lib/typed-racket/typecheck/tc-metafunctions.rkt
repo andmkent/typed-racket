@@ -4,7 +4,7 @@
          racket/match racket/list
          (except-in (types abbrev utils prop-ops tc-result)
                     -> ->* one-of/c)
-         (rep type-rep prop-rep object-rep values-rep rep-utils)
+         (rep type-rep prop-rep object-rep values-rep rep-utils var)
          (typecheck tc-subst)
          (contract-req))
 
@@ -14,18 +14,18 @@
          tc-results->values)
 
 ;; Objects representing the rest argument are currently not supported
-(define/cond-contract (abstract-results results arg-names #:rest-id [rest-id #f])
-  ((tc-results/c (listof identifier?)) (#:rest-id (or/c #f identifier?))
+(define/cond-contract (abstract-results results arg-vars #:rest-var [rest-var #f])
+  ((tc-results/c (listof var?)) (#:rest-var (or/c #f var?))
    . ->* . SomeValues?)
   (define positional-arg-objects
-    (for/list ([n (in-range (length arg-names))])
+    (for/list ([n (in-range (length arg-vars))])
       (make-Path null (cons 0 n))))
-  (define-values (names objects)
-    (if rest-id
-        (values (cons rest-id arg-names)
+  (define-values (vars objects)
+    (if rest-var
+        (values (cons rest-var arg-vars)
                 (cons -empty-obj positional-arg-objects))
-        (values arg-names positional-arg-objects)))
-  (tc-results->values (replace-names names objects results)))
+        (values arg-vars positional-arg-objects)))
+  (tc-results->values (replace-vars vars objects results)))
 
 (define (tc-results->values tc)
   (match (fix-results tc)
