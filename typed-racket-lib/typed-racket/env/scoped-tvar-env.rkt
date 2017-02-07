@@ -3,18 +3,28 @@
 ;; Maintain mapping of type variables introduced by literal Alls in type annotations.
 
 (require "../utils/utils.rkt"
+         (contract-req)
          (private syntax-properties)
+         (rep var)
          syntax/parse
-         syntax/id-table
-         racket/match)
+         racket/match
+         data/ddict)
 
-(provide register-scoped-tvars lookup-scoped-tvars
-         add-scoped-tvars lookup-scoped-tvar-layer)
+(provide/cond-contract
+ [register-scoped-tvars (-> Id? any/c void?)]
+ [lookup-scoped-tvars (-> Id? any/c)]
+ [add-scoped-tvars (-> syntax? (or/c #f (listof Id?)) void?)]
+ [lookup-scoped-tvar-layer (-> syntax? (listof (listof Id?)))])
 
-;; tvar-stx-mapping: (hash/c syntax? (listof (listof identifier?)))
+(define-for-cond-contract tvar-annotation/c
+  (listof (listof (or/c (listof Id?)
+                        (list (listof Id?) Id?)))))
+
+
+;; tvar-stx-mapping: (hash/c syntax? (listof (listof Id?)))
 (define tvar-stx-mapping (make-weak-hash))
 
-;; add-scoped-tvars: syntax? (or/c #f (listof identifier)) -> void?
+;; add-scoped-tvars: syntax? (or/c #f (listof Id?)) -> void?
 ;; Annotate the given expression with the given identifiers if it is safe.
 ;; If there are no identifiers, then nothing is done.
 ;; Safe expressions are lambda, case-lambda, or the expansion of keyword and opt-lambda forms.
@@ -46,15 +56,15 @@
 ;; tvar-mapping: (free-id-table/c tvar-annotation?)
 ;; Keeps track of type variables that should be introduced when type checking
 ;; the definition for an identifier.
-(define tvar-mapping (make-free-id-table))
+(define tvar-mapping (mutable-ddict))
 
-;; lookup-scoped-tvars: identifier -> (or/c #f tvar-annotation?)
+;; lookup-scoped-tvars: var -> (or/c #f tvar-annotation?)
 ;; Lookup an indentifier in the scoped tvar-mapping.
-(define (lookup-scoped-tvars id)
-  (free-id-table-ref tvar-mapping id #f))
+(define (lookup-scoped-tvars var)
+  (ddict-ref tvar-mapping var #f))
 
 ;; Register type variables for an indentifier in the scoped tvar-mapping.
-;; register-scoped-tvars: identifier? tvar-annotation? -> void?
-(define (register-scoped-tvars id tvars)
-  (free-id-table-set! tvar-mapping id tvars))
+;; register-scoped-tvars: var? tvar-annotation? -> void?
+(define (register-scoped-tvars var tvars)
+  (ddict-set! tvar-mapping var tvars))
 

@@ -85,14 +85,14 @@
                (let ([new-t (make-pred-ty (list dom)
                                           rng
                                           (make-Refinement dom #'t.predicate))])
-                 (register-type #'t.predicate new-t))
+                 (register-type (var #'t.predicate) new-t))
                (list)]
               [t (tc-error "cannot declare refinement for non-predicate ~a" t)])]
 
       ;; require/typed
       [r:typed-require
        (let ([t (parse-type #'r.type)])
-         (register-type #'r.name t)
+         (register-type (var #'r.name) t)
          (list (make-def-binding #'r.name t)))]
 
       [r:typed-require/struct
@@ -104,7 +104,7 @@
                           ((map fld-t (Struct-flds body)) #f . ->* . (make-App t (map make-F ns))))]
                        [else
                         ((map fld-t (Struct-flds struct-type)) #f . ->* . t)])])
-         (register-type #'r.name mk-ty)
+         (register-type (var #'r.name) mk-ty)
          (list (make-def-binding #'r.name mk-ty)))]
 
       ;; define-typed-struct (handled earlier)
@@ -113,13 +113,13 @@
 
       ;; predicate assertion - needed for define-type b/c or doesn't work
       [p:predicate-assertion
-       (register-type #'p.predicate (make-pred-ty (parse-type #'p.type)))
+       (register-type (var #'p.predicate) (make-pred-ty (parse-type #'p.type)))
        (list)]
 
       ;; top-level type annotation
       [t:type-declaration
-       (register-type/undefined #'t.id (parse-type #'t.type))
-       (register-scoped-tvars #'t.id (parse-literal-alls #'t.type))
+       (register-type/undefined (var #'t.id) (parse-type #'t.type))
+       (register-scoped-tvars (var #'t.id) (parse-literal-alls #'t.type))
        (list)]
 
       ;; definitions lifted from contracts should be ignored
@@ -138,21 +138,22 @@
        (list)]
 
       ;; values definitions
-      [(define-values (var ...) expr)
-       (define vars (syntax->list #'(var ...)))
-       (syntax-parse vars
+      [(define-values (x ...) expr)
+       (define xs (syntax->list #'(x ...)))
+       (syntax-parse xs
          ;; if all the variables have types, we stick them into the environment
          [(v:type-label^ ...)
-          (let ([ts (map (λ (x) (get-type x #:infer #f)) vars)])
+          (let ([ts (map (λ (x) (get-type x #:infer #f)) xs)]
+                [vars (map var xs)])
             (for-each register-type-if-undefined vars ts)
-            (map make-def-binding vars ts))]
+            (map make-def-binding xs ts))]
          ;; if this already had an annotation, we just construct the binding reps
          [(v:typed-id^ ...)
           (define top-level? (eq? (syntax-local-context) 'top-level))
-          (for ([var (in-list vars)])
-            (when (free-id-table-ref unann-defs var #f)
-              (free-id-table-remove! unann-defs var))
-            (finish-register-type var top-level?))
+          (for* ([x (in-list xs)])
+            (when (free-id-table-ref unann-defs x #f)
+              (free-id-table-remove! unann-defs x))
+            (finish-register-type (var x) top-level?))
           (stx-map make-def-binding #'(v ...) (attribute v.type))]
          ;; defer to pass1.5
          [_ (list)])]
@@ -189,9 +190,9 @@
        #:do [(register-ignored! #'expr)]
        (list)]
 
-      [(define-values (var ...) expr)
-       (define vars (syntax->list #'(var ...)))
-       (syntax-parse vars
+      [(define-values (x ...) expr)
+       (define xs (syntax->list #'(x ...)))
+       (syntax-parse xs
          ;; Do nothing for annotated/typed things
          [(v:type-label^ ...) (list)]
          [(v:typed-id^ ...) (list)]
@@ -202,12 +203,13 @@
          ;; error due to un-annotated variables that come later in
          ;; the module (hence we haven't synthesized a type for yet).
          [_
-          (match (get-type/infer vars #'expr tc-expr tc-expr/check)
+          (match (get-type/infer xs #'expr tc-expr tc-expr/check)
             [(list (tc-result: ts) ...)
-             (for/list ([i (in-list vars)] [t (in-list ts)])
-               (register-type i t)
-               (free-id-table-set! unann-defs i #t)
-               (make-def-binding i t))])])]
+             (for/list ([x (in-list xs)]
+                        [t (in-list ts)])
+               (register-type (var x) t)
+               (free-id-table-set! unann-defs x #t)
+               (make-def-binding x t))])])]
 
       ;; for the top-level, as for pass1
       [(begin . rest)
@@ -278,10 +280,10 @@
        #:when (for/and ([v (in-syntax #'(var ...))])
                 (free-id-table-ref unann-defs v (lambda _ #f)))
        'no-type]
-      [(define-values (var:typed-id^ ...) expr)
-       (let ([ts (attribute var.type)])
+      [(define-values (x:typed-id^ ...) expr)
+       (let ([ts (attribute x.type)])
          (when (= 1 (length ts))
-           (add-scoped-tvars #'expr (lookup-scoped-tvars (stx-car #'(var ...)))))
+           (add-scoped-tvars #'expr (lookup-scoped-tvars (var (stx-car #'(x ...))))))
          (tc-expr/check #'expr (ret ts)))
        'no-type]
 
@@ -602,6 +604,6 @@
      ;; (define-new-subtype-internal name (constructor rep-type) #:gen-id gen-id)
      (define ty (parse-type (attribute form.name)))
      (define rep-ty (parse-type (attribute form.rep-type)))
-     (register-type (attribute form.constructor) (-> rep-ty ty))
+     (register-type (var (attribute form.constructor)) (-> rep-ty ty))
      (list)]))
 

@@ -173,7 +173,7 @@
   ;; FIXME: can this pass be fused with the one immediately above?
   (for ([n (in-list names)] [b (in-list exprs)])
     (syntax-case n ()
-      [(var) (add-scoped-tvars b (lookup-scoped-tvars #'var))]
+      [(x) (add-scoped-tvars b (lookup-scoped-tvars (var #'x)))]
       [_ (void)]))
 
   ;; Finalize signatures, by parsing member types

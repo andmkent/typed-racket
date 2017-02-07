@@ -24,21 +24,20 @@
 ;; syntax -> Maybe[Type]
 ;; is let-binding really necessary? - remember to record the bugs!
 (define (type-annotation stx #:infer [let-binding #f])
-  (define (pt prop)
-    (when (and (identifier? stx)
-               let-binding)
-      (define t1 (parse-type/id stx prop))
-      (define t2 (lookup-type stx (lambda () #f)))      
-      (when (and t2 (not (equal? t1 t2)))
-        (maybe-finish-register-type stx)
-        (tc-error/delayed #:stx stx "Duplicate type annotation of ~a for ~a, previous was ~a" t1 (syntax-e stx) t2)))
-    (if (syntax? prop)
-        (parse-type prop)
-        (parse-type/id stx prop)))
-  ;(unless let-binding (error 'ohno))
-  ;(printf "in type-annotation:~a\n" (syntax->datum stx))
   (syntax-parse stx
-    [(~or v:type-label^) (pt (attribute v.value))]
+    [(~or v:type-label^)
+     (define prop (attribute v.value))
+     (when (and (identifier? stx)
+                let-binding)
+       (define t1 (parse-type/id stx prop))
+       (define x (var stx))
+       (define t2 (lookup-type x (lambda () #f)))      
+       (when (and t2 (not (equal? t1 t2)))
+         (maybe-finish-register-type stx)
+         (tc-error/delayed #:stx stx "Duplicate type annotation of ~a for ~a, previous was ~a" t1 (syntax-e stx) t2)))
+     (if (syntax? prop)
+         (parse-type prop)
+         (parse-type/id stx prop))]
     [i:typed-id^
      (maybe-finish-register-type stx)
      (attribute i.type)]

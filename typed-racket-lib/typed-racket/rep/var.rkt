@@ -14,41 +14,42 @@
 ;; program we are type checking (i.e. its
 ;; a fresh variable, or a quantified variable we
 ;; are now considering, etc
-(struct var (id)
+(struct Id (val)
   #:methods gen:custom-write
   [(define (write-proc v port mode)
      (define inner-str
-       (match (var-id v)
-         [(? identifier? id) (format "~a" (var-id v))]
+       (match (Id-val v)
+         [(? identifier? id) (format "~a" (Id-val v))]
          [_ (format "~a" (eq-hash-code v))]))
      (write-string (format "(var ~a)" inner-str) port))])
 
-(define-match-expander var:
+(define-match-expander Id:
   (λ (stx) (syntax-case stx ()
-             [(_ id-pat) (syntax/loc stx (var id-pat))])))
+             [(_ id-pat) (syntax/loc stx (Id id-pat))])))
 
 (define id-table (make-free-id-table))
 
-(define (id->var id)
+(define (identifier->Id id)
   (cond
     [(free-id-table-ref! id-table id #f)]
     [else
-     (define v (var id))
+     (define v (Id id))
      (free-id-table-set! id-table id v)
      v]))
 
 ;; since our var structs are opaque
 ;; and w/o a custom equality, this generates
 ;; fresh vars. the #f signals there is no inner id
-(define (genvar) (var #f))
+(define (genId) (Id #f))
 
 
-(define var=? eq?)
+(define Id=? eq?)
 
 (provide/cond-contract
- [var? (-> any/c boolean?)]
- [var-id (-> var? (or/c identifier? #f))]
- [var=? (-> var? var? boolean?)]
- [genvar (-> var?)]
- (rename id->var var (-> identifier? var?)))
-(provide var:)
+ [Id? (-> any/c boolean?)]
+ [Id-val (-> Id? (or/c identifier? #f))]
+ [Id=? (-> Id? Id? boolean?)]
+ [genId (-> Id?)]
+ (rename identifier->Id var (-> identifier? Id?)))
+
+(provide Id:)
