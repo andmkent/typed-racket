@@ -44,16 +44,16 @@
 ;; comment out the above lazy-require and uncomment the following
 ;; s-exp for simple debug printing of Rep structs
 #;(begin
-    (define (debug-printer rep port write?)
-      (display (cons (Rep-name rep) (Rep-values rep)) port))
+  (define (debug-printer rep port write?)
+    (display (cons (Rep-name rep) (Rep-values rep)) port))
 
-    (define print-type debug-printer)
-    (define print-prop debug-printer)
-    (define print-object debug-printer)
-    (define print-pathelem debug-printer)
-    (define print-values debug-printer)
-    (define print-propset debug-printer)
-    (define print-result debug-printer))
+  (define print-type debug-printer)
+  (define print-prop debug-printer)
+  (define print-object debug-printer)
+  (define print-pathelem debug-printer)
+  (define print-values debug-printer)
+  (define print-propset debug-printer)
+  (define print-result debug-printer))
 
 (define-syntax (def-rep-class stx)
   (syntax-parse stx

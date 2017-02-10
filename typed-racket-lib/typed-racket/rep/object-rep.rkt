@@ -10,10 +10,11 @@
          "rep-utils.rkt"
          "core-rep.rkt"
          "free-variance.rkt"
+         "ident.rkt"
          (env mvar-env)
          (contract-req))
 
-(provide -id-path name-ref=?)
+(provide -id-path)
 
 (def-pathelem CarPE () [#:singleton -car])
 (def-pathelem CdrPE () [#:singleton -cdr])
@@ -31,13 +32,13 @@
   [#:fmap (f) (make-Path (map f elems) name)]
   [#:for-each (f) (for-each f elems)]
   [#:custom-constructor (-> ([elems (listof PathElem?)]
-                             [name name-ref/c])
+                             [name (or/c name-ref/c identifier?)])
                             OptObject?)
    (cond
      [(identifier? name)
       (if (is-var-mutated? name)
           -empty-obj
-          (let ([name (normalize-id name)])
+          (let ([name (->Id name)])
             (intern-double-ref!
              path-intern-table
              name elems #:construct (make-Path elems name))))]

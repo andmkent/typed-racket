@@ -51,6 +51,15 @@
 (provide (all-defined-out)
          (except-out (all-from-out "base-abbrev.rkt" "match-expanders.rkt") make-arr))
 
+;; note, these are number? #f
+(define/decl -ExtFlonumZero (Un -ExtFlonumPosZero -ExtFlonumNegZero -ExtFlonumNan))
+(define/decl -PosExtFlonum (Un -PosExtFlonumNoNan -ExtFlonumNan))
+(define/decl -NonNegExtFlonum (Un -PosExtFlonum -ExtFlonumZero))
+(define/decl -NegExtFlonum (Un -NegExtFlonumNoNan -ExtFlonumNan))
+(define/decl -NonPosExtFlonum (Un -NegExtFlonum -ExtFlonumZero))
+(define/decl -ExtFlonum (Un -NegExtFlonumNoNan -ExtFlonumNegZero -ExtFlonumPosZero -PosExtFlonumNoNan -ExtFlonumNan))
+
+
 ;; Convenient constructors
 (define -App make-App)
 (define -mpair make-MPair)
@@ -78,8 +87,6 @@
   (apply Un (map -val args)))
 
 (define (-opt t) (Un (-val #f) t))
-
-(define (-ne-lst t) (-pair t (-lst t)))
 
 ;; Convenient constructor for Values
 ;; (wraps arg types with Result)
@@ -156,14 +163,6 @@
 (define/decl -PathConventionType (Un (-val 'unix) (-val 'windows)))
 (define/decl -Log-Level (one-of/c 'fatal 'error 'warning 'info 'debug))
 (define/decl -Place-Channel (Un -Place -Base-Place-Channel))
-
-;; note, these are number? #f
-(define/decl -ExtFlonumZero (Un -ExtFlonumPosZero -ExtFlonumNegZero -ExtFlonumNan))
-(define/decl -PosExtFlonum (Un -PosExtFlonumNoNan -ExtFlonumNan))
-(define/decl -NonNegExtFlonum (Un -PosExtFlonum -ExtFlonumZero))
-(define/decl -NegExtFlonum (Un -NegExtFlonumNoNan -ExtFlonumNan))
-(define/decl -NonPosExtFlonum (Un -NegExtFlonum -ExtFlonumZero))
-(define/decl -ExtFlonum (Un -NegExtFlonumNoNan -ExtFlonumNegZero -ExtFlonumPosZero -PosExtFlonumNoNan -ExtFlonumNan))
 
 ;; Type alias names
 (define (-struct-name name)
@@ -264,3 +263,5 @@
 (define-syntax-rule (-object . ?clauses)
   (make-Instance (-class . ?clauses)))
 
+
+(define (-ne-lst t) (-pair t (-lst t)))

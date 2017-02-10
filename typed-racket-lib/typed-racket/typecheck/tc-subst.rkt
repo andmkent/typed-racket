@@ -100,7 +100,7 @@
     (match r-o
       [(Path: flds nm)
        (cond
-         [(assoc nm targets name-ref=?) =>
+         [(assoc nm targets) =>
           (match-lambda
             [(list _ _ t)
              (or (path-type flds t) Univ)])]
@@ -160,7 +160,7 @@
       [(Path: flds nm)
        (let ([flds (map subst flds)])
          (cond
-           [(assoc nm targets name-ref=?) =>
+           [(assoc nm targets) =>
             (λ (l) (match (second l)
                      [(Empty:) -empty-obj]
                      [(Path: flds* nm*)
@@ -170,7 +170,7 @@
       [(TypeProp: (Path: flds nm) ty-at-flds)
        (let ([flds (map subst flds)])
          (cond
-           [(assoc nm targets name-ref=?) =>
+           [(assoc nm targets) =>
             (match-lambda
               [(list _ new-obj new-obj-ty)
                (define arg-ty-at-flds (or (path-type flds new-obj-ty) Univ))
@@ -186,7 +186,7 @@
       [(NotTypeProp: (Path: flds nm) not-ty-at-flds)
        (let ([flds (map subst flds)])
          (cond
-           [(assoc nm targets name-ref=?) =>
+           [(assoc nm targets) =>
             (match-lambda
               [(list _ new-obj new-obj-ty)
                (define arg-ty-at-flds (or (path-type flds new-obj-ty) Univ))

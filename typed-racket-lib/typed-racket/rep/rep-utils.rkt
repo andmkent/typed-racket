@@ -6,6 +6,7 @@
          (contract-req)
          "free-variance.rkt"
          "type-mask.rkt"
+         "ident.rkt"
          racket/stxparam
          syntax/parse/define
          syntax/id-table
@@ -37,26 +38,8 @@
        (>= (length l) len)))
 
 (define-for-cond-contract name-ref/c
-  (or/c identifier?
-        (cons/c exact-integer? exact-integer?)))
+  (or/c Id? (cons/c exact-integer? exact-integer?)))
 
-(define (name-ref=? x y)
-  (cond
-    [(identifier? x)
-     (and (identifier? y) (free-identifier=? x y))]
-    [else (equal? x y)]))
-
-(define id-table (make-free-id-table))
-(define (normalize-id id)
-  (free-id-table-ref! id-table id id))
-
-(define (hash-id id)
-  (eq-hash-code (identifier-binding-symbol id)))
-
-(define (hash-name-ref name rec)
-  (if (identifier? name)
-      (hash-id name)
-      (rec name)))
 
 
 ;; This table maps a type to an identifier bound to the type.
@@ -216,16 +199,28 @@
      #:with free-idxs (fixed-rep-transform #'self #'f #'free-idxs* struct-fields #'body)))
   (define-syntax-class (constructor-spec constructor-name
                                          raw-constructor-name
-                                         args)
+                                         args
+                                         flds
+                                         fld-cs)
     #:attributes (def)
     (pattern body
              #:with def
              (with-syntax ([constructor-name constructor-name]
                            [raw-constructor-name raw-constructor-name]
-                           [(args ...) args])
-               #'(define (constructor-name args ...)
-                   (let ([constructor-name raw-constructor-name])
-                     . body)))))
+                           [(args ...) args]
+                           [(flds ...) flds ]
+                           [(fld-cs ...) fld-cs])
+               (if enable-contracts?
+                   #'(define (constructor-name args ...)
+                       (let ([constructor-name (λ (flds ...) (if (and (fld-cs flds) ...)
+                                                                 (raw-constructor-name flds ...)
+                                                                 (error 'constructor-name
+                                                                        "invalid internal constructor usage. values: ~a"
+                                                                        (list flds ...))))])
+                         . body))
+                   #'(define (constructor-name args ...)
+                       (let ([constructor-name raw-constructor-name])
+                         . body))))))
   ;; definer parser for functions who operate on Reps. Fields are automatically bound
   ;; to the struct-field id names in the body. An optional self argument can be specified.
   (define-syntax-class (generic-transformer struct-fields)
@@ -295,7 +290,9 @@
                    . (~var constr-def
                            (constructor-spec #'var.constructor
                                              #'var.raw-constructor
-                                             #'(custom-arg ...)))])
+                                             #'(custom-arg ...)
+                                             #'(flds.ids ...)
+                                             #'(flds.contracts ...)))])
        (~optional (~and #:non-transparent non-transparent-kw))
        ;; #:extras to specify other struct properties in a per-definition manner
        (~optional [#:extras . extras]))
