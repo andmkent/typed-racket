@@ -214,14 +214,16 @@
       . body)
      #:with free-vars (fixed-rep-transform #'self #'f #'free-vars* struct-fields #'body)
      #:with free-idxs (fixed-rep-transform #'self #'f #'free-idxs* struct-fields #'body)))
-  (define-syntax-class (constructor-spec constructor-name raw-constructor-name struct-fields)
+  (define-syntax-class (constructor-spec constructor-name
+                                         raw-constructor-name
+                                         args)
     #:attributes (def)
     (pattern body
              #:with def
              (with-syntax ([constructor-name constructor-name]
                            [raw-constructor-name raw-constructor-name]
-                           [(struct-fields ...) struct-fields])
-               #'(define (constructor-name struct-fields ...)
+                           [(args ...) args])
+               #'(define (constructor-name args ...)
                    (let ([constructor-name raw-constructor-name])
                      . body)))))
   ;; definer parser for functions who operate on Reps. Fields are automatically bound
@@ -288,10 +290,12 @@
        ;; #:no-provide option (i.e. don't provide anything automatically)
        (~optional (~and #:no-provide no-provide?-kw))
        (~optional [#:singleton singleton:id])
-       (~optional [#:custom-constructor . (~var constr-def
-                                                (constructor-spec #'var.constructor
-                                                                  #'var.raw-constructor
-                                                                  #'(flds.ids ...)))])
+       (~optional [#:custom-constructor ((~datum ->) ([custom-arg:id custom-arg/c:expr] ...)
+                                                     custom-rng/c)
+                   . (~var constr-def
+                           (constructor-spec #'var.constructor
+                                             #'var.raw-constructor
+                                             #'(custom-arg ...)))])
        (~optional (~and #:non-transparent non-transparent-kw))
        ;; #:extras to specify other struct properties in a per-definition manner
        (~optional [#:extras . extras]))
@@ -336,7 +340,9 @@
        ([uid-id (format-id #'var.name "uid:~a" (syntax->datum #'var.name))]
         [(parent ...) (if (attribute parent) #'(parent) #'())]
         ;; contract for constructor
-        [constructor-contract #'(-> flds.contracts ... any)]
+        [constructor-contract (if (attribute constr-def)
+                                  #'(-> custom-arg/c ... custom-rng/c)
+                                  #'(-> flds.contracts ... any))]
         [constructor-name (if (attribute constr-def)
                               #'var.raw-constructor
                               #'var.constructor)]

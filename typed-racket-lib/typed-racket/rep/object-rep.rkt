@@ -30,7 +30,9 @@
   [#:frees (f)  (combine-frees (map f elems))]
   [#:fmap (f) (make-Path (map f elems) name)]
   [#:for-each (f) (for-each f elems)]
-  [#:custom-constructor
+  [#:custom-constructor (-> ([elems (listof PathElem?)]
+                             [name name-ref/c])
+                            OptObject?)
    (cond
      [(identifier? name)
       (if (is-var-mutated? name)

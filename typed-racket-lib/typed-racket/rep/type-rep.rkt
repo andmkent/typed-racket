@@ -124,7 +124,10 @@
                 [args exact-nonnegative-integer?]
                 [struct? boolean?])
   #:base
-  [#:custom-constructor
+  [#:custom-constructor (-> ([id identifier?]
+                             [args exact-nonnegative-integer?]
+                             [struct? boolean?])
+                            Name?)
    (free-id-table-ref! Name-table id (λ () (make-Name id args struct?)))])
 
 ;; rator is a type
@@ -406,7 +409,7 @@
   [#:fmap (f) (make-Mu (f body))]
   [#:for-each (f) (f body)]
   [#:mask (λ (t) (mask (Mu-body t)))]
-  [#:custom-constructor
+  [#:custom-constructor (-> ([body Type?]) Mu?)
    (cond
      [(Bottom? body) -Bottom]
      [(or (Base? body)
@@ -448,7 +451,7 @@
 
 (def-type Opaque ([pred identifier?])
   #:base
-  [#:custom-constructor
+  [#:custom-constructor (-> ([pred identifier?]) Opaque?)
    (make-Opaque (normalize-id pred))])
 
 
@@ -526,7 +529,7 @@
   [#:frees (f) (if mutable? (make-invariant (f t)) (f t))]
   [#:fmap (f) (make-fld (f t) acc mutable?)]
   [#:for-each (f) (f t)]
-  [#:custom-constructor
+  [#:custom-constructor (-> ([t Type?] [acc identifier?] [mutable? boolean?]) fld?)
    (make-fld t (normalize-id acc) mutable?)])
 
 ;; poly? : is this type polymorphically variant
@@ -553,7 +556,13 @@
    (when proc (f proc))]
   ;; This should eventually be based on understanding of struct properties.
   [#:mask (mask-union mask:struct mask:procedure)]
-  [#:custom-constructor
+  [#:custom-constructor (-> ([name identifier?]
+                             [parent (or/c #f Struct?)]
+                             [flds (listof fld?)]
+                             [proc (or/c #f Function?)]
+                             [poly? boolean?]
+                             [pred-id identifier?])
+                            Struct?)
    (make-Struct (normalize-id name)
                 parent
                 flds
@@ -602,7 +611,7 @@
                    [(? string?) mask:base]
                    [(? char?) mask:base]
                    [_ mask:unknown]))]
-  [#:custom-constructor
+  [#:custom-constructor (-> ([val any/c]) Type?)
    (match val
      [#f -False]
      [#t -True]
@@ -632,7 +641,7 @@
 ;; is used to remove overlapping types from unions.
 (def-type Union ([mask type-mask?]
                  [base (or/c Bottom? Base? BaseUnion?)]
-                 [ts (cons/c Type? (cons/c Type? (listof Type?)))]
+                 [ts (listof Type?)]
                  [elems (and/c (set/c Type?)
                                (λ (h) (> (set-count h) 1)))])
   #:no-provide
@@ -641,7 +650,12 @@
   [#:fmap (f) (Union-fmap f base ts)]
   [#:for-each (f) (for-each f ts)]
   [#:mask (λ (t) (Union-mask t))]
-  [#:custom-constructor
+  [#:custom-constructor (-> ([mask type-mask?]
+                             [base (or/c Bottom? Base? BaseUnion?)]
+                             [ts (listof Type?)]
+                             [elems (and/c (set/c Type?)
+                                           (λ (h) (> (set-count h) 1)))])
+                            (or/c Union? Base? BaseUnion? Bottom?))
    ;; make sure we do not build Unions equivalent to
    ;; Bottom, a single BaseUnion, or a single type
    (cond
@@ -713,7 +727,7 @@
   (define bbits #b0)
   (define nbits #b0)
   (define ts '())
-  (define elems (mutable-set))
+  (define elems (set))
   ;; add a Base element to the union
   (define (add-base! numeric? bits)
     (cond
@@ -740,10 +754,10 @@
        (add-any-base! b*)
        (set! ts (append ts* ts))
        (for ([t* (in-list ts*)])
-         (set-add! elems t*))]
+         (set! elems (set-add elems t*)))]
       [t (set! m (mask-union m (mask t)))
          (set! ts (cons t ts))
-         (set-add! elems t)]))
+         (set! elems (set-add elems t))]))
   ;; process the input arguments
   (process! base-arg)
   (for-each process! args)
@@ -772,7 +786,9 @@
   [#:mask (λ (t) (for/fold ([m mask:unknown])
                            ([elem (in-list (Intersection-ts t))])
                    (mask-intersect m (mask elem))))]
-  [#:custom-constructor
+  [#:custom-constructor (-> ([ts (cons/c Type? (cons/c Type? (listof Type?)))]
+                             [elems (set/c Type?)])
+                            Intersection?)
    (intern-single-ref! intersection-table
                        elems
                        #:construct (make-Intersection ts elems))])
@@ -815,7 +831,8 @@
   [#:fmap (f) (make-Refinement (f parent) pred)]
   [#:for-each (f) (f parent)]
   [#:mask (λ (t) (mask (Refinement-parent t)))]
-  [#:custom-constructor (make-Refinement parent (normalize-id pred))])
+  [#:custom-constructor (-> ([parent Type?] [pred identifier?]) Refinement?)
+   (make-Refinement parent (normalize-id pred))])
 
 ;; A Row used in type instantiation
 ;; For now, this should not appear in user code. It's used
@@ -908,7 +925,10 @@
   [#:for-each (f) (for-each (match-lambda
                               [(cons _ t) (f t)])
                             mapping)]
-  [#:custom-constructor
+  [#:custom-constructor (-> ([name identifier?]
+                             [extends (or/c identifier? #f)]
+                             [mapping (listof (cons/c identifier? Type?))])
+                            Signature?)
    (make-Signature (normalize-id name)
                    (and extends (normalize-id extends))
                    (for*/list ([p (in-list mapping)]
@@ -960,7 +980,7 @@
   [#:fmap (f) (make-Distinction nm id (f ty))]
   [#:for-each (f) (f ty)]
   [#:mask (λ (t) (mask (Distinction-ty t)))]
-  [#:custom-constructor
+  [#:custom-constructor (-> ([nm symbol?] [id symbol?] [ty Type?]) Distinction?)
    (if (Bottom? ty)
        -Bottom
        (make-Distinction nm id ty))])
