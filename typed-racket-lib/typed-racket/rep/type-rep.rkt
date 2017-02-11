@@ -86,6 +86,8 @@
 
 (define var-name-table (make-hash))
 
+(define struct-mask (mask-union mask:struct mask:procedure))
+
 ;; Name = Symbol
 
 ;; Type is defined in rep-utils.rkt
@@ -111,8 +113,6 @@
   [#:fmap (_ #:self self) self]
   [#:for-each (_) (void)])
 
-(define Name-table (make-free-id-table))
-
 ;; Name, an indirection of a type through the environment
 ;;
 ;; interp.
@@ -125,11 +125,17 @@
                 [args exact-nonnegative-integer?]
                 [struct? boolean?])
   #:base
-  [#:custom-constructor (-> ([id Id?]
+  [#:mask (λ (t) (if (Name-struct? t)
+                     struct-mask
+                     mask:unknown))]
+  [#:custom-constructor (-> ([id ident/c]
                              [args exact-nonnegative-integer?]
                              [struct? boolean?])
                             Name?)
-   (free-id-table-ref! Name-table id (λ () (make-Name id args struct?)))])
+   (let ([id (->Id id)])
+     (hash-ref! Name-table id (λ () (make-Name id args struct?))))])
+
+(define Name-table (make-weak-hash))
 
 ;; rator is a type
 ;; rands is a list of types
@@ -452,7 +458,7 @@
 
 (def-type Opaque ([pred Id?])
   #:base
-  [#:custom-constructor (-> ([pred (or/c Id? identifier?)]) Opaque?)
+  [#:custom-constructor (-> ([pred ident/c]) Opaque?)
    (make-Opaque (->Id pred))])
 
 
@@ -530,7 +536,7 @@
   [#:frees (f) (if mutable? (make-invariant (f t)) (f t))]
   [#:fmap (f) (make-fld (f t) acc mutable?)]
   [#:for-each (f) (f t)]
-  [#:custom-constructor (-> ([t Type?] [acc (or/c Id? identifier?)] [mutable? boolean?]) fld?)
+  [#:custom-constructor (-> ([t Type?] [acc ident/c] [mutable? boolean?]) fld?)
    (make-fld t (->Id acc) mutable?)])
 
 ;; poly? : is this type polymorphically variant
@@ -556,13 +562,13 @@
    (for-each f flds)
    (when proc (f proc))]
   ;; This should eventually be based on understanding of struct properties.
-  [#:mask (mask-union mask:struct mask:procedure)]
-  [#:custom-constructor (-> ([name (or/c Id? identifier?)]
+  [#:mask struct-mask]
+  [#:custom-constructor (-> ([name ident/c]
                              [parent (or/c #f Struct?)]
                              [flds (listof fld?)]
                              [proc (or/c #f Function?)]
                              [poly? boolean?]
-                             [pred-id (or/c Id? identifier?)])
+                             [pred-id ident/c])
                             Struct?)
    (make-Struct (->Id name)
                 parent
@@ -830,7 +836,7 @@
   [#:fmap (f) (make-Refinement (f parent) pred)]
   [#:for-each (f) (f parent)]
   [#:mask (λ (t) (mask (Refinement-parent t)))]
-  [#:custom-constructor (-> ([parent Type?] [pred (or/c Id? identifier?)]) Refinement?)
+  [#:custom-constructor (-> ([parent Type?] [pred ident/c]) Refinement?)
    (make-Refinement parent (->Id pred))])
 
 ;; A Row used in type instantiation
@@ -924,9 +930,9 @@
   [#:for-each (f) (for-each (match-lambda
                               [(cons _ t) (f t)])
                             mapping)]
-  [#:custom-constructor (-> ([name (or/c Id? identifier?)]
-                             [extends (or/c (or/c Id? identifier?) #f)]
-                             [mapping (listof (cons/c (or/c Id? identifier?) Type?))])
+  [#:custom-constructor (-> ([name ident/c]
+                             [extends (or/c ident/c #f)]
+                             [mapping (listof (cons/c ident/c Type?))])
                             Signature?)
    (make-Signature (->Id name)
                    (and extends (->Id extends))

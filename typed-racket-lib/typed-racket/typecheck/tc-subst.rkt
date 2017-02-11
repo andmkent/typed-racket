@@ -12,7 +12,8 @@
          (only-in (infer infer) intersect restrict)
          (types subtype)
          (rep core-rep type-rep object-rep
-              prop-rep rep-utils values-rep))
+              prop-rep rep-utils values-rep
+              ident))
 
 (provide/cond-contract
  [restrict-values (-> SomeValues? (listof Type?) SomeValues?)]
@@ -100,7 +101,7 @@
     (match r-o
       [(Path: flds nm)
        (cond
-         [(assoc nm targets) =>
+         [(assoc nm targets ident=?) =>
           (match-lambda
             [(list _ _ t)
              (or (path-type flds t) Univ)])]
@@ -142,7 +143,7 @@
 ;; identifiers being substituted out, the optional object replacing
 ;; them, and their type).
 (define/cond-contract (subst-rep rep targets)
-  (-> any/c (listof (list/c name-ref/c OptObject? Type?))
+  (-> any/c (listof (list/c (or/c identifier? name-ref/c) OptObject? Type?))
       any/c)
   (define (sub/inc rep)
     (subst-rep rep (inc-lvls targets)))
@@ -160,7 +161,7 @@
       [(Path: flds nm)
        (let ([flds (map subst flds)])
          (cond
-           [(assoc nm targets) =>
+           [(assoc nm targets ident=?) =>
             (λ (l) (match (second l)
                      [(Empty:) -empty-obj]
                      [(Path: flds* nm*)
@@ -170,7 +171,7 @@
       [(TypeProp: (Path: flds nm) ty-at-flds)
        (let ([flds (map subst flds)])
          (cond
-           [(assoc nm targets) =>
+           [(assoc nm targets ident=?) =>
             (match-lambda
               [(list _ new-obj new-obj-ty)
                (define arg-ty-at-flds (or (path-type flds new-obj-ty) Univ))
@@ -186,7 +187,7 @@
       [(NotTypeProp: (Path: flds nm) not-ty-at-flds)
        (let ([flds (map subst flds)])
          (cond
-           [(assoc nm targets) =>
+           [(assoc nm targets ident=?) =>
             (match-lambda
               [(list _ new-obj new-obj-ty)
                (define arg-ty-at-flds (or (path-type flds new-obj-ty) Univ))

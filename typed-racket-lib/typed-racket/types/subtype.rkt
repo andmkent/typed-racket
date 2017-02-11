@@ -5,7 +5,7 @@
          (contract-req)
          (rep type-rep prop-rep object-rep
               core-rep type-mask values-rep rep-utils
-              free-variance rep-switch)
+              free-variance rep-switch ident)
          (utils tc-utils)
          (types utils resolve match-expanders current-seen
                 numeric-tower substitute prefab signatures)
@@ -302,7 +302,7 @@
       (match par
         [(Poly: _ (Struct: p-name _ _ _ _ _)) p-name]
         [(Struct: p-name _ _ _ _ _) p-name]))
-    (or (free-identifier=? s-name p-name)
+    (or (Id=? s-name p-name)
         (match s
           [(Poly: _ (? Struct? s*)) (in-hierarchy? s* par)]
           [(Struct: _ (and (Name/struct:) p) _ _ _ _)
@@ -883,7 +883,7 @@
   [(case: Refinement (Refinement: t1-parent id1))
    (match t2
      [(Refinement: t2-parent id2)
-      #:when (free-identifier=? id1 id2)
+      #:when (Id=? id1 id2)
       (subtype* A t1-parent t2-parent)]
      [_ (cond
           [(subtype* A t1-parent t2)]
@@ -907,7 +907,7 @@
       #f]
      ;; subtyping on immutable structs is covariant
      [(Struct: nm2 _ flds2 proc2 _ _)
-      #:when (free-identifier=? nm1 nm2)
+      #:when (Id=? nm1 nm2)
       (let ([A (remember t1 t2 A)])
         (with-updated-seen A
           (let ([A (cond [(and proc1 proc2) (subtype* A proc1 proc2)]
@@ -915,7 +915,7 @@
                          [else A])])
             (and A (subtype/flds* A flds1 flds2)))))]
      [(StructTop: (Struct: nm2 _ _ _ _ _))
-      #:when (free-identifier=? nm1 nm2)
+      #:when (Id=? nm1 nm2)
       A]
      [(Val-able: (? (negate struct?) _)) #f]
      ;; subtyping on structs follows the declared hierarchy

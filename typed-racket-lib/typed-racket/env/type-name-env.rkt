@@ -9,7 +9,7 @@
          (contract-req)
          (env type-alias-env)
          (utils tc-utils)
-         (rep type-rep free-variance)
+         (rep type-rep free-variance ident)
          (types utils))
 
 (provide/cond-contract [register-type-name
@@ -18,7 +18,7 @@
                         (-> (listof identifier?) (listof Type?) any)]
                        [add-alias (-> identifier? identifier? any)]
                        [type-name-env-map
-                        (-> (-> identifier? (or/c #t Type?) any) any)]
+                        (-> (-> ident/c (or/c #t Type?) any) any)]
                        [type-variance-env-map
                         (-> (-> identifier? (listof variance?) any) any)]
                        [type-name-env-for-each
@@ -26,11 +26,11 @@
                        [type-variance-env-for-each
                         (-> (-> identifier? (listof variance?) any) void?)]
                        [lookup-type-name
-                        (->* (identifier?) (procedure?) (or/c #t Type?))]
+                        (->* (ident/c) (procedure?) (or/c #t Type?))]
                        [register-type-variance!
                         (-> identifier? (listof variance?) any)]
                        [lookup-type-variance
-                        (-> identifier? (listof variance?))]
+                        (-> ident/c (listof variance?))]
                        [add-constant-variance!
                         (-> identifier? (or/c #f (listof identifier?)) any)]
                        [refine-variance!
@@ -56,7 +56,7 @@
 ;; identifier (-> error) -> type
 (define (lookup-type-name id [k (lambda () (lookup-type-fail id))])
   (begin0
-    (free-id-table-ref the-mapping id k)
+    (free-id-table-ref the-mapping (->identifier id) k)
     (add-disappeared-use id)))
 
 
@@ -85,7 +85,7 @@
 
 (define (lookup-type-variance id)
   (free-id-table-ref
-   variance-mapping id
+   variance-mapping (->identifier id)
    (lambda () (lookup-variance-fail id))))
 
 ;; map over the-mapping, producing a list

@@ -4,7 +4,7 @@
          syntax/struct syntax/parse racket/function racket/match racket/list
 
          (prefix-in c: (contract-req))
-         (rep type-rep object-rep free-variance)
+         (rep type-rep object-rep free-variance ident)
          (private parse-type syntax-properties)
          (types abbrev subtype utils resolve substitute struct-table prefab)
          (env global-env type-name-env type-alias-env tvar-env)
@@ -222,13 +222,13 @@
     (register-type (binding-name b) (def-binding-ty b)))
 
   (append
-    (if (free-identifier=? (struct-names-type-name names)
-                           (struct-names-constructor names))
-      null
-      (list constructor-binding))
+   (if (ident=? (struct-names-type-name names)
+                          (struct-names-constructor names))
+       null
+       (list constructor-binding))
    (cons
-     (make-def-struct-stx-binding (struct-names-type-name names) si (def-binding-ty constructor-binding))
-     bindings)))
+    (make-def-struct-stx-binding (struct-names-type-name names) si (def-binding-ty constructor-binding))
+    bindings)))
 
 (define (register-parsed-struct-sty! ps)
   (match ps

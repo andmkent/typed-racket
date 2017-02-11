@@ -76,7 +76,7 @@
 (define ntprop-intern-table (make-weak-hash))
 
 ;; Abbreviation for make-NotTypeProp
-(define-syntax -not-type (make-rename-transformer #'make-TypeProp))
+(define-syntax -not-type (make-rename-transformer #'make-NotTypeProp))
 
 (def-prop OrProp ([ps (listof (or/c TypeProp? NotTypeProp?))])
   [#:frees (f) (combine-frees (map f ps))]

@@ -8,7 +8,7 @@
          racket/list
          racket/set
          (path-up "rep/type-rep.rkt" "rep/prop-rep.rkt" "rep/object-rep.rkt"
-                  "rep/core-rep.rkt" "rep/values-rep.rkt"
+                  "rep/core-rep.rkt" "rep/values-rep.rkt" "../rep/ident.rkt"
                   "rep/rep-utils.rkt" "types/subtype.rkt" "types/overlap.rkt"
                   "types/match-expanders.rkt"
                   "types/kw-types.rkt"
@@ -120,7 +120,10 @@
 
 (define name-ref->sexp
   (match-lambda
-    [(? syntax? name-ref) (syntax-e name-ref)]
+    [(or     (? syntax? name-ref)
+         (Id (? syntax? name-ref)))
+     (syntax-e name-ref)]
+    [(and id (Id #f)) (string->symbol (string-append "id" (eq-hash-code id)))]
     [(cons lvl arg) `(,lvl ,arg)]))
 
 ;; prop->sexp : Prop -> S-expression

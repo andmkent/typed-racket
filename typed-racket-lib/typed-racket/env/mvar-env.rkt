@@ -1,6 +1,7 @@
 #lang racket/base
 
-(require syntax/id-table)
+(require "../rep/ident.rkt"
+         syntax/id-table)
 
 (provide mvar-env register-mutated-var is-var-mutated?)
 
@@ -10,4 +11,5 @@
   (free-id-table-set! mvar-env id #t))
 
 (define (is-var-mutated? id)
-  (free-id-table-ref mvar-env id #f))
+  (define ident (->identifier id))
+  (and ident (free-id-table-ref mvar-env ident #f)))
