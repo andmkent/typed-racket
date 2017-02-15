@@ -3,9 +3,11 @@
 ;; Internal structures for representing a static contract.
 
 (require "../utils/utils.rkt"
+         (rep ident)
          (contract-req)
          racket/match racket/list racket/generic 
-         "kinds.rkt" "constraints.rkt")
+         "kinds.rkt"
+         "constraints.rkt")
 
 (provide prop:combinator-name gen:sc)
 
@@ -110,50 +112,51 @@
 ;; - values : (listof static-contract?)
 ;; - body : static-contract?
 ;; names and value must have the same length.
-(struct recursive-sc static-contract (names values body)
-        #:transparent
-        #:methods gen:sc
-          [(define (sc-map v f)
-             (match v
-               [(recursive-sc names values body)
-                (recursive-sc names (map (λ (v) (f v 'covariant)) values) (f body 'covariant))]))
-           (define (sc-traverse v f)
-             (match v
-               [(recursive-sc names values body)
-                (for-each (λ (v) (f v 'covariant)) values)
-                (f body 'covariant)
-                (void)]))
-           (define (sc->constraints v f)
-             (simple-contract-restrict 'impersonator))]
-        #:methods gen:custom-write [(define write-proc recursive-sc-write-proc)])
+(def-struct/cond-contract recursive-sc static-contract ([names (listof Id?)]
+                                                        [values (listof static-contract?)]
+                                                        [body static-contract?])
+  #:transparent
+  #:methods gen:sc
+  [(define (sc-map v f)
+     (match v
+       [(recursive-sc names values body)
+        (recursive-sc names (map (λ (v) (f v 'covariant)) values) (f body 'covariant))]))
+   (define (sc-traverse v f)
+     (match v
+       [(recursive-sc names values body)
+        (for-each (λ (v) (f v 'covariant)) values)
+        (f body 'covariant)
+        (void)]))
+   (define (sc->constraints v f)
+     (simple-contract-restrict 'impersonator))]
+  #:methods gen:custom-write [(define write-proc recursive-sc-write-proc)])
 
 ;; A use of a contract bound by recursive-sc
 ;; - name : identifier?
-(struct recursive-sc-use static-contract (name)
-        #:transparent
-        #:methods gen:sc
-          [(define (sc-map v f) v)
-           (define (sc-traverse v f) (void))
-           (define (sc->contract v f) (recursive-sc-use-name v))
-           (define (sc->constraints v f) (variable-contract-restrict (recursive-sc-use-name v)))]
-        #:methods gen:custom-write [(define write-proc recursive-sc-use-write-proc)])
+(def-struct/cond-contract recursive-sc-use static-contract ([name Id?])
+  #:transparent
+  #:methods gen:sc
+  [(define (sc-map v f) v)
+   (define (sc-traverse v f) (void))
+   (define (sc->contract v f) (recursive-sc-use-name v))
+   (define (sc->constraints v f) (variable-contract-restrict (recursive-sc-use-name v)))]
+  #:methods gen:custom-write [(define write-proc recursive-sc-use-write-proc)])
 
 ;; Super struct of static contract combinators.
 ;; Provides printing functionality.
 ;; - args : (sequenceof static-contract?)
-(struct combinator static-contract (args)
-        #:transparent
-        #:property prop:combinator-name "combinator/sc"
-        #:methods gen:custom-write [(define write-proc combinator-write-proc)])
+(def-struct/cond-contract combinator static-contract ([args sequence?])
+  #:transparent
+  #:property prop:combinator-name "combinator/sc"
+  #:methods gen:custom-write [(define write-proc combinator-write-proc)])
 
+
+(provide (struct-out recursive-sc)
+         (struct-out recursive-sc-use)
+         (struct-out combinator)
+         (struct-out static-contract))
 
 (provide/cond-contract
- (struct recursive-sc ([names (listof identifier?)]
-                       [values (listof static-contract?)]
-                       [body static-contract?]))
- (struct recursive-sc-use ([name identifier?]))
- (struct combinator ([args sequence?]))
- (struct static-contract ())
  [sc-map
   (static-contract? (static-contract? variance/c . -> . static-contract?) . -> . static-contract?)]
  [sc-traverse (static-contract? (static-contract? variance/c . -> . any/c) . -> . void?)]

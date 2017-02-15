@@ -4,6 +4,7 @@
 ;; contracts. Example: (length/sc 1).
 
 (require
+  "../utils/utils.rkt"
   "structures.rkt"
   "constraints.rkt"
    racket/match
@@ -31,8 +32,8 @@
 
 (define-syntax (define-terminal-sc stx)
   (syntax-parse stx
-    [(_ name:id (args:id ...) kind:kind-keyword p:printer body:expr)
-     #'(struct name static-contract (args ...)
+    [(_ name:id ([args:id arg/cs:expr] ...) kind:kind-keyword p:printer body:expr)
+     #'(def-struct/cond-contract name static-contract ([args arg/cs] ...)
          #:transparent
          p.methods ...
          #:methods gen:sc

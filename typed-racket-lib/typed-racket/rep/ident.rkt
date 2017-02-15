@@ -3,6 +3,7 @@
 (require "../utils/utils.rkt"
          (contract-req)
          racket/match
+         racket/syntax
          syntax/id-table
          (submod racket/performance-hint begin-encourage-inline)
          (for-syntax racket/base))
@@ -53,10 +54,12 @@
   (define (->identifier id)
     (if (Id? id) (Id-val id) id)))
 
-;; since our var structs are opaque
-;; and w/o a custom equality, this generates
-;; fresh vars. the #f signals there is no inner id
-(define (genId) (Id #f))
+
+(define (genId [name (generate-temporary)])
+  (Id name))
+
+(define (genIds stx)
+  (map genId (generate-temporaries stx)))
 
 (define-syntax Id=? (make-rename-transformer #'eq?))
 
@@ -65,9 +68,10 @@
 (provide/cond-contract
  [->Id (-> (or/c identifier? Id?) Id?)]
  [Id? (-> any/c boolean?)]
- [Id-val (-> Id? (or/c identifier? #f))]
+ [Id-val (-> Id? identifier?)]
  [Id=? (-> Id? Id? boolean?)]
- [genId (-> Id?)]
+ [genId (->* () (any/c) Id?)]
+ [genIds (-> (or/c syntax? list?) (listof Id?))]
  [ident=? (-> (or/c ident/c
                     (cons/c exact-integer? exact-integer?)
                     (cons/c exact-integer? exact-integer?))
@@ -75,7 +79,7 @@
                     (cons/c exact-integer? exact-integer?)
                     (cons/c exact-integer? exact-integer?))
               boolean?)]
- [->identifier (-> (or/c identifier? Id?) (or/c #f identifier?))])
+ [->identifier (-> (or/c identifier? Id?) identifier?)])
 
 (provide-for-cond-contract ident/c)
 

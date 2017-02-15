@@ -42,33 +42,35 @@
              (equal?/recur (syntax-e s1) (syntax-e s2) stx-equal?)
              (equal?/recur s1 s2 stx-equal?))]))
 
-(struct simple-contract static-contract (syntax kind name)
-        #:transparent
-        #:methods gen:equal+hash
-         [(define (equal-proc s1 s2 recur)
-            (and ;; have to make sure identifiers are compared by free-id=?
-                 ;; because of struct predicates, opaque, etc.
-                 (stx-equal? (simple-contract-syntax s1)
-                             (simple-contract-syntax s2))
-                 (recur (simple-contract-kind s1)
-                        (simple-contract-kind s2))
-                 (recur (simple-contract-name s1)
-                        (simple-contract-name s2))))
-          (define (hash-proc sc hash-code)
-            (bitwise-ior (hash-code (syntax->datum (simple-contract-syntax sc)))
-                         (hash-code (simple-contract-kind sc))
-                         (hash-code (simple-contract-name sc))))
-          (define (hash2-proc sc hash-code)
-            (bitwise-ior (hash-code (syntax->datum (simple-contract-syntax sc)))
-                         (hash-code (simple-contract-kind sc))
-                         (hash-code (simple-contract-name sc))))]
-        #:methods gen:sc
-         [(define (sc-map v f) v)
-          (define (sc-traverse v f) (void))
-          (define (sc->contract v f) (simple-contract-syntax v))
-          (define (sc->constraints v f) (simple-contract-restrict (simple-contract-kind v)))
-          (define (sc-terminal-kind v) (simple-contract-kind v))]
-        #:methods gen:custom-write [(define write-proc simple-contract-write-proc)])
+(def-struct/cond-contract simple-contract static-contract ([syntax syntax?]
+                                                           [kind symbol?]
+                                                           [name any/c])
+  #:transparent
+  #:methods gen:equal+hash
+  [(define (equal-proc s1 s2 recur)
+     (and ;; have to make sure identifiers are compared by free-id=?
+      ;; because of struct predicates, opaque, etc.
+      (stx-equal? (simple-contract-syntax s1)
+                  (simple-contract-syntax s2))
+      (recur (simple-contract-kind s1)
+        (simple-contract-kind s2))
+      (recur (simple-contract-name s1)
+        (simple-contract-name s2))))
+   (define (hash-proc sc hash-code)
+     (bitwise-ior (hash-code (syntax->datum (simple-contract-syntax sc)))
+                  (hash-code (simple-contract-kind sc))
+                  (hash-code (simple-contract-name sc))))
+   (define (hash2-proc sc hash-code)
+     (bitwise-ior (hash-code (syntax->datum (simple-contract-syntax sc)))
+                  (hash-code (simple-contract-kind sc))
+                  (hash-code (simple-contract-name sc))))]
+  #:methods gen:sc
+  [(define (sc-map v f) v)
+   (define (sc-traverse v f) (void))
+   (define (sc->contract v f) (simple-contract-syntax v))
+   (define (sc->constraints v f) (simple-contract-restrict (simple-contract-kind v)))
+   (define (sc-terminal-kind v) (simple-contract-kind v))]
+  #:methods gen:custom-write [(define write-proc simple-contract-write-proc)])
 
 (define (flat/sc ctc [name #f])
   (simple-contract ctc 'flat name))

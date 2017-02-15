@@ -450,7 +450,7 @@
     [(Univ:) 'Any]
     [(Bottom:) 'Nothing]
     ;; struct names are just printed as the original syntax
-    [(Name/struct: id) (syntax-e id)]
+    [(Name/struct: (Id id)) (syntax-e id)]
     ;; If a type has a name, then print it with that name.
     ;; However, we expand the alias in some cases
     ;; (i.e., the fuel is > 0) for the :type form.
@@ -475,11 +475,11 @@
     ;; values like characters (when `display`ed)
     [(Val-able: v) (format "~v" v)]
     [(? Base?) (Base-name type)]
-    [(StructType: (Struct: nm _ _ _ _ _)) `(StructType ,(syntax-e nm))]
+    [(StructType: (Struct: (Id nm) _ _ _ _ _)) `(StructType ,(syntax-e nm))]
     ;; this case occurs if the contained type is a type variable
     [(StructType: ty) `(Struct-Type ,(t->s ty))]
     [(StructTypeTop:) 'Struct-TypeTop]
-    [(StructTop: (Struct: nm _ _ _ _ _)) `(Struct ,(syntax-e nm))]
+    [(StructTop: (Struct: (Id nm) _ _ _ _ _)) `(Struct ,(syntax-e nm))]
     [(Prefab: key field-types)
      `(Prefab ,(abbreviate-prefab-key key)
               ,@(map t->s field-types))]
@@ -506,7 +506,7 @@
     [(? tuple? t)
      `(List ,@(map type->sexp (tuple-elems t)))]
     [(Opaque: pred) `(Opaque ,(syntax->datum pred))]
-    [(Struct: nm       par (list (fld: t _ _) ...)       proc _ _)
+    [(Struct: (Id nm) par (list (fld: t _ _) ...) proc _ _)
      `#(,(string->symbol (format "struct:~a" (syntax-e nm)))
         ,(map t->s t)
         ,@(if proc (list (t->s proc)) null))]
@@ -596,7 +596,7 @@
        ,(values->sexp body))]
     [(UnitTop:) 'UnitTop]
     [(MPair: s t) `(MPairof ,(t->s s) ,(t->s t))]
-    [(Refinement: parent p?)
+    [(Refinement: parent (Id p?))
      `(Refinement ,(t->s parent) ,(syntax-e p?))]
     [(Sequence: ts)
      `(Sequenceof ,@(map t->s ts))]

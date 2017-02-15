@@ -11,8 +11,12 @@
          (for-syntax racket/base syntax/parse))
 
 (provide prompt-tag/sc:)
+
 (provide/cond-contract
- [prompt-tag/sc ((listof static-contract?) (or/c (listof static-contract?) #f) . -> . static-contract?)])
+ [prompt-tag/sc ((listof static-contract?)
+                 (or/c (listof static-contract?) #f)
+                 . -> .
+                 static-contract?)])
 
 (struct prompt-tag-combinator combinator ()
   #:transparent
@@ -35,7 +39,9 @@
      (define (sc->constraints v f)
        (merge-restricts* 'chaperone (map f (pt-seq->list (combinator-args v)))))])
 
-(struct pt-seq (vals call-cc))
+(def-struct/cond-contract pt-seq ([vals (listof static-contract?)]
+                                  [call-cc (or/c (listof static-contract?) #f)]))
+
 
 (define (prompt-tag/sc vals call-cc)
   (prompt-tag-combinator (pt-seq vals call-cc)))

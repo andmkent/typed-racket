@@ -8,7 +8,8 @@
  (rep type-rep prop-rep object-rep)
  (utils tc-utils)
  (env type-name-env row-constraint-env)
- (rep core-rep rep-utils type-mask values-rep base-types numeric-base-types)
+ (rep core-rep rep-utils type-mask values-rep
+      base-types numeric-base-types ident)
  (types resolve utils printer match-expanders union)
  (prefix-in t: (types abbrev numeric-tower subtype))
  (private parse-type syntax-properties)
@@ -364,7 +365,7 @@
         ;; Name type alone
         (cond [(hash-ref recursive-values (cons name 'app) #f)]
               [else
-               (define name* (generate-temporary name))
+               (define name* (genId))
                (recursive-sc (list name*)
                              (list
                               (t->sc (resolve-once type)
@@ -622,7 +623,7 @@
           [(hash-ref recursive-values nm #f)]
           [proc (fail #:reason "procedural structs are not supported")]
           [poly?
-           (define nm* (generate-temporary #'n*))
+           (define nm* (genId))
            (define fields
              (for/list ([fty flds] [mut? mut?])
                (t->sc fty #:recursive-values (hash-set

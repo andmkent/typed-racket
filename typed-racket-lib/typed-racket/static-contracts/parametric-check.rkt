@@ -7,7 +7,7 @@
   "../utils/utils.rkt"
   (contract-req)
   racket/match
-  syntax/private/id-table
+  syntax/id-table
   "structures.rkt"
   "equations.rkt"
   "combinators/parametric.rkt"

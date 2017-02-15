@@ -9,13 +9,13 @@
 
 ;; this structure represents the result of typechecking an expression
 ;; fields are #f only when the direct result of parsing or annotations
-(define-struct/cond-contract tc-result
+(def-struct/cond-contract tc-result
   ([t Type?] [pset (c:or/c PropSet? #f)] [o (c:or/c OptObject? #f)])
   #:transparent)
-(define-struct/cond-contract tc-results
+(def-struct/cond-contract tc-results
   ([ts (c:listof tc-result?)] [drest (c:or/c (c:cons/c Type? symbol?) #f)])
   #:transparent)
-(define-struct/cond-contract tc-any-results ([f (c:or/c Prop? #f)]) #:transparent)
+(def-struct/cond-contract tc-any-results ([f (c:or/c Prop? #f)]) #:transparent)
 
 (define (tc-results/c v)
   (or (tc-results? v)
@@ -103,7 +103,7 @@
 ;; convenience function for returning the result of typechecking an expression
 (define ret
   (case-lambda [(t)
-                (make-tc-results
+                (tc-results
                  (cond [(Type? t)
                         (list (-tc-result t -tt-propset -empty-obj))]
                        [else
@@ -111,14 +111,14 @@
                           (-tc-result i -tt-propset -empty-obj))])
                  #f)]
                [(t pset)
-                (make-tc-results
+                (tc-results
                  (if (Type? t)
                      (list (-tc-result t pset -empty-obj))
                      (for/list ([i (in-list t)] [pset (in-list pset)])
                        (-tc-result i pset -empty-obj)))
                  #f)]
                [(t pset o)
-                (make-tc-results
+                (tc-results
                  (if (and (list? t) (list? pset) (list? o))
                      (map -tc-result t pset o)
                      (list (-tc-result t pset o)))
@@ -126,7 +126,7 @@
                [(t pset o dty)
                 (int-err "ret used with dty without dbound")]
                [(t pset o dty dbound)
-                (make-tc-results
+                (tc-results
                  (if (and (list? t) (list? pset) (list? o))
                      (map -tc-result t pset o)
                      (list (-tc-result t pset o)))

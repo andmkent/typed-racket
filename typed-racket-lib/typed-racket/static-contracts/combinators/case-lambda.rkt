@@ -82,15 +82,17 @@
        (or range empty))]))
 
 
-(struct arr-seq (args rest range)
-   #:transparent
-   #:property prop:sequence
-     (match-lambda
-       [(arr-seq args rest range)
-        (append
-          args
-          (if rest (list rest) empty)
-          (if range range empty))]))
+(def-struct/cond-contract arr-seq ([args (listof static-contract?)]
+                                   [rest (or/c static-contract? #f)]
+                                   [range (or/c (listof static-contract?) #f)])
+  #:transparent
+  #:property prop:sequence
+  (match-lambda
+    [(arr-seq args rest range)
+     (append
+      args
+      (if rest (list rest) empty)
+      (if range range empty))]))
 
 
 (provide/cond-contract

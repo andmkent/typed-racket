@@ -17,14 +17,14 @@
          make-simple-substitution)
 (provide-for-cond-contract substitution/c)
 
-(define-struct/cond-contract subst-rhs () #:transparent)
-(define-struct/cond-contract (t-subst subst-rhs) ([type Rep?]) #:transparent)
-(define-struct/cond-contract (i-subst subst-rhs) ([types (listof Rep?)]) #:transparent)
-(define-struct/cond-contract (i-subst/starred subst-rhs) ([types (listof Rep?)] [starred Rep?]) #:transparent)
-(define-struct/cond-contract (i-subst/dotted subst-rhs) ([types (listof Rep?)] [dty Rep?] [dbound symbol?]) #:transparent)
+(struct subst-rhs () #:transparent)
+(def-struct/cond-contract t-subst subst-rhs ([type Rep?]) #:transparent)
+(def-struct/cond-contract i-subst subst-rhs ([types (listof Rep?)]) #:transparent)
+(def-struct/cond-contract i-subst/starred subst-rhs ([types (listof Rep?)] [starred Rep?]) #:transparent)
+(def-struct/cond-contract i-subst/dotted subst-rhs ([types (listof Rep?)] [dty Rep?] [dbound symbol?]) #:transparent)
 
-(define-for-cond-contract substitution/c (hash/c symbol? subst-rhs? #:immutable #t))
-(define-for-cond-contract simple-substitution/c (hash/c symbol? Rep? #:immutable #t))
+(define-for-cond-contract substitution/c (hash/c symbol? subst-rhs? #:immutable #t #:flat? #t))
+(define-for-cond-contract simple-substitution/c (hash/c symbol? Rep? #:immutable #t #:flat? #t))
 
 (define (subst v t e) (substitute t v e))
 

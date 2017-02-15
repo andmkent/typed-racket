@@ -9,8 +9,9 @@
   (contract-req)
   "combinators.rkt"
   "structures.rkt"
+  (rep ident)
   racket/syntax
-  syntax/private/id-table
+  data/ddict
   racket/list
   racket/match)
 
@@ -133,33 +134,33 @@
 
 (define (remove-unused-recursive-contracts sc)
   (define root (generate-temporary))
-  (define main-table (make-free-id-table))
+  (define main-table (mutable-ddict))
   (define (search)
-    (define table (make-free-id-table))
+    (define table (mutable-ddict))
     (define (recur sc variance)
       (match sc
         [(recursive-sc-use id)
-         (free-id-table-set! table id #t)]
+         (ddict-set! table id #t)]
         [(recursive-sc names values body)
          (recur body 'covariant)
          (for ([name (in-list names)]
                [value (in-list values)])
-          (free-id-table-set! main-table name ((search) value)))]
+          (ddict-set! main-table name ((search) value)))]
         [else
           (sc-traverse sc recur)]))
     (lambda (sc)
       (recur sc 'covariant)
       table))
   (define reachable ((search) sc))
-  (define seen (make-free-id-table reachable))
+  (define seen (ddict-copy reachable))
   (let loop ((to-look-at reachable))
-    (unless (zero? (free-id-table-count to-look-at))
-      (define new-table (make-free-id-table))
-      (for ([(id _) (in-free-id-table to-look-at)])
-        (for ([(id _) (in-free-id-table (free-id-table-ref main-table id))])
-          (unless (free-id-table-ref seen id #f)
-            (free-id-table-set! seen id #t)
-            (free-id-table-set! new-table id #t))))
+    (unless (ddict-empty? to-look-at)
+      (define new-table (mutable-ddict))
+      (for ([(id _) (in-ddict to-look-at)])
+        (for ([(id _) (in-ddict (ddict-ref main-table id))])
+          (unless (ddict-ref seen id #f)
+            (ddict-set! seen id #t)
+            (ddict-set! new-table id #t))))
       (loop new-table)))
 
   ;; Determine if the recursive name is referenced in the static contract
@@ -167,7 +168,7 @@
     (let/ec exit
       (define (recur sc variance)
         (match sc
-          [(recursive-sc-use (== new-name free-identifier=?))
+          [(recursive-sc-use (== new-name Id=?))
            (exit #f)]
           [else
             (sc-traverse sc recur)]))
@@ -182,7 +183,7 @@
        (define new-name-values
          (for/list ([name (in-list names)]
                     [value (in-list values)]
-                    #:when (free-id-table-ref seen name #f))
+                    #:when (ddict-ref seen name #f))
             (list name value)))
        (define new-names (map first new-name-values))
        (define new-values (map (λ (v) (trim v 'covariant))
@@ -192,7 +193,7 @@
          [(and
             (equal? (length new-names) 1)
             (recursive-sc-use? new-body)
-            (free-identifier=? (first new-names) (recursive-sc-use-name new-body))
+            (Id=? (first new-names) (recursive-sc-use-name new-body))
             (unused? (first new-names) (first new-values)))
           (first new-values)]
          [else

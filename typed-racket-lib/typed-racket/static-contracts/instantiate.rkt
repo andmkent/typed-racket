@@ -4,11 +4,12 @@
 
 (require
   "../utils/utils.rkt"
+  (rep ident)
   racket/match
   racket/list
   racket/contract
   racket/syntax
-  syntax/private/id-table
+  syntax/id-table
   (for-template racket/base racket/contract)
   "combinators.rkt"
   "combinators/name.rkt"
@@ -134,7 +135,7 @@
   ;; top-level? is #t only for the first call and not for recursive
   ;; calls, which helps for inlining
   (define (recur sc [top-level? #f])
-    (cond [(and cache (hash-ref cache sc #f)) => car]
+    (cond [(and cache (hash-ref cache sc #f)) => (λ (l) (Id-val (car l)))]
           [(arr/sc? sc) (make-contract sc)]
           [(or (parametric->/sc? sc) (sealing->/sc? sc))
            (match-define (or (parametric->/sc: vars _)
@@ -156,10 +157,10 @@
                        (or (not (should-inline-contract? ctc))
                            (not top-level?))
                        cache)
-                  (define fresh-id (generate-temporary))
+                  (define fresh-id (genId))
                   (hash-set! cache sc (cons fresh-id ctc))
                   (set! sc-queue (cons sc sc-queue))
-                  fresh-id]
+                  (Id-val fresh-id)]
                  [else ctc])]))
   (define (make-contract sc)
     (match sc
@@ -173,9 +174,9 @@
        (define bindings
          (for/list ([name (in-list names)]
                     [raw-name (in-list raw-names)])
-            #`[#,name (recursive-contract #,raw-name
-                                            #,(kind->keyword
-                                                (hash-ref recursive-kinds name)))]))
+           #`[#,(Id-val name) (recursive-contract #,raw-name
+                                                  #,(kind->keyword
+                                                     (hash-ref recursive-kinds name)))]))
        #`(letrec (#,@bindings #,@raw-bindings)
            #,(parameterize ([bound-names (append names (bound-names))])
                (recur body)))]
@@ -196,14 +197,14 @@
                       [sc   (in-list (apply append (hash-values name-defs)))]
                       #:unless (lookup-name-defined name))
              (set-name-defined name)
-             #`(define #,name
+             #`(define #,(Id-val name)
                  (recursive-contract #,(recur sc)
                                      #,(kind->keyword (hash-ref recursive-kinds name)))))]))
   (list (append ;; These contracts are sub-contract definitions used to
                 ;; increase sharing among contracts in a given fixup pass
                 extra-defs
                 (for/list ([sc (in-list (reverse sc-queue))])
-                  (match-define (cons id ctc) (hash-ref cache sc))
+                  (match-define (cons (Id id) ctc) (hash-ref cache sc))
                   #`(define #,id #,ctc)))
         ctc))
 
@@ -227,7 +228,7 @@
             (sealing-var/sc: name*)
             (name/sc: name*))
         _)
-       (when (free-identifier=? name name*)
+       (when (Id=? name name*)
          (escape #t))]
       [(_ _) (sc-traverse sc free?)])
     (free? sc 'dummy)

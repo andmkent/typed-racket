@@ -22,7 +22,11 @@
                   (or/c #f (listof static-contract?))
                   static-contract?)])
 
-(struct function-combinator combinator (indices mand-kws opt-kws typed-side?)
+(def-struct/cond-contract function-combinator combinator
+  ([indices (listof (or/c exact-integer? #f))]
+   [mand-kws (listof keyword?)]
+   [opt-kws (listof keyword?)]
+   [typed-side? boolean?])
         #:property prop:combinator-name "->/sc"
         #:methods gen:equal+hash [(define (equal-proc a b recur) (function-sc-equal? a b recur))
                                   (define (hash-proc v recur) (function-sc-hash v recur))

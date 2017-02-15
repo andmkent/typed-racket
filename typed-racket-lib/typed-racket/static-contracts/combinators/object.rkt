@@ -5,6 +5,7 @@
 
 (require "../../utils/utils.rkt"
          "../structures.rkt" "../constraints.rkt"
+         (rep ident)
          racket/list racket/match
          (contract-req)
          racket/syntax
@@ -13,7 +14,7 @@
                        typed-racket/utils/opaque-object)
          (for-syntax racket/base syntax/parse))
 
-(struct member-spec (modifier id sc) #:transparent)
+(def-struct/cond-contract member-spec ([modifier symbol?] [id Id?] [sc static-contract]) #:transparent)
 
 (define field-modifiers '(field init init-field inherit-field))
 (define method-modifiers '(method inherit super inner override augment augride))
@@ -106,7 +107,7 @@
      (with-syntax ([ctc-stx (and sc (f sc) empty)]
                    [id-stx id])
        (define id/ctc
-         (if sc #`(#,id #,(f sc)) id))
+         (if sc #`(#,(Id-val id) #,(f sc)) (Id-val id)))
        (match modifier
          ['method id/ctc]
          ['inner #`(inner #,id/ctc)]

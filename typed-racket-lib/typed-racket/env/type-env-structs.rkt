@@ -9,12 +9,12 @@
 
 ;; types is a free-id-table of identifiers to types
 ;; props is a list of known propositions
-(define-struct/cond-contract env ([types hash?] 
-                                  [props (listof Prop?)]
-                                  [aliases hash?])
+(def-struct/cond-contract env ([types hash?]
+                               [props (listof Prop?)]
+                               [aliases hash?])
   #:transparent
   #:property prop:custom-write
-  (lambda (e prt mode)
+  (λ (e prt mode)
     (fprintf prt "(env ~a ~a ~a)"
              (hash-map (env-types e)
                        (λ (id ty) (format "[~a ∈ ~a]" id ty)))

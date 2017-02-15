@@ -4,13 +4,18 @@
 
 (require "../../utils/utils.rkt"
          "../structures.rkt" "../constraints.rkt"
+         (rep ident)
          racket/list racket/match
          (contract-req)
          racket/syntax
          (for-template racket/base racket/unit)
          (for-syntax racket/base syntax/parse))
 
-(struct signature-spec (name members scs) #:transparent)
+
+(def-struct/cond-contract signature-spec ([name Id?]
+                                          [members (listof Id?)]
+                                          [scs (listof static-contract?)])
+  #:transparent)
 
 (struct unit-combinator combinator ()
         #:transparent
@@ -39,9 +44,13 @@
                      ;; there are no contracts attached
                      (filter-map (lambda (x) x) invoke)))]))
 
-(struct unit-spec (imports exports init-depends invoke) 
-        #:transparent
-        #:property prop:sequence unit-spec->list)
+
+(def-struct/cond-contract unit-spec ([imports (listof signature-spec?)]
+                                     [exports (listof signature-spec?)]
+                                     [init-depends (listof Id?)]
+                                     [invoke (listof static-contract?)])
+  #:transparent
+  #:property prop:sequence unit-spec->list)
 
 (define (unit-spec-sc-map f seq)
   (match seq
@@ -74,8 +83,8 @@
        (match sig-spec
          [(signature-spec name members scs)
           (define member-stx
-            (map (lambda (id sc) #`(#,id #,(f sc))) members scs))
-          #`(#,name #,@member-stx)]))
+            (map (lambda (id sc) #`(#,(Id-val id) #,(f sc))) members scs))
+          #`(#,(Id-val name) #,@member-stx)]))
      
      (define (invokes->contract lst)
        (cond

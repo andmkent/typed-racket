@@ -5,10 +5,11 @@ This file is for utilities that are of general interest,
 at least theoretically.
 |#
 
-(require (for-syntax racket/base racket/string)
+(require (for-syntax racket/base racket/string racket/syntax racket/match)
          racket/require-syntax racket/provide-syntax
          racket/match
          syntax/parse/define
+         racket/list
          racket/struct-info "timing.rkt")
 
 (provide
@@ -99,7 +100,7 @@ at least theoretically.
 (provide (for-syntax enable-contracts?)
          provide/cond-contract
          with-cond-contract
-         define-struct/cond-contract
+         def-struct/cond-contract
          define/cond-contract
          contract-req
          define/provide
@@ -191,12 +192,33 @@ at least theoretically.
           [(_ head cnt . body)
            (syntax/loc stx (define head . body))]))))
 
-(define-syntax define-struct/cond-contract
-  (if enable-contracts?
-      (make-rename-transformer #'define-struct/contract)
-      (syntax-rules ()
-        [(_ hd ([i c] ...) . opts)
-         (define-struct hd (i ...) . opts)])))
+(define-syntax (def-struct/cond-contract stx)
+  (syntax-parse stx
+    [(~or (_ name:id ([fld:id fld/c:expr] ...) . options)
+          (_ name:id parent:id ([fld:id fld/c:expr] ...) . options))
+     (with-syntax* ([parent-arity-expr (if (attribute parent)
+                                           #'(procedure-arity parent)
+                                           #'0)]
+                    [(parent ...) (if (attribute parent)
+                                      #'(parent)
+                                      #'())]
+
+                    [(maybe-guard ...)
+                     (if enable-contracts?
+                         #'(#:guard (let ([parent-arg-count parent-arity-expr])
+                                      (unless (exact-nonnegative-integer? parent-arg-count)
+                                        (error 'name "the crappy def-struct/cond-contract macro cant figure out how many parent arguments there are"))
+                                      (λ args
+                                        (match-define-values (parent-arg-list (list fld ... _)) (split-at args parent-arg-count))
+                                        (unless (and (fld/c fld) ...)
+                                          (error 'name "invalid arguments: ~a" (list fld ...)))
+                                        ;; return args-1 values (the last is meta info for the guard)
+                                        (apply values (append parent-arg-list (list fld ...))))))
+                         #'())])
+       (syntax/loc stx
+         (struct name parent ... (fld ...)
+           maybe-guard ...
+           . options)))]))
 
 
 (provide make-struct-info-self-ctor)

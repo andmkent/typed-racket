@@ -18,10 +18,10 @@
  [empty-list/sc static-contract?]
  [empty-vector/sc static-contract?])
 
-(define-terminal-sc list-length/sc (n) #:flat
+(define-terminal-sc list-length/sc ([n exact-nonnegative-integer?]) #:flat
    #`(λ (l) (and (list? l) (= #,n (length l)))))
 
-(define-terminal-sc vector-length/sc (n) #:flat
+(define-terminal-sc vector-length/sc ([n exact-nonnegative-integer?]) #:flat
    #`(λ (l) (and (vector? l) (= #,n (vector-length l)))))
 
 (define (list-length/sc* n)

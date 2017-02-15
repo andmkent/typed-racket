@@ -12,7 +12,7 @@
          (rep core-rep type-rep
               prop-rep rep-utils
               object-rep values-rep
-              free-variance)
+              free-variance ident)
          (for-syntax syntax/parse racket/base)
          (types abbrev struct-table utils)
          data/queue
@@ -216,13 +216,13 @@
                                          (map type->sexp elems)))]
     [(Intersection: elems)
      `(make-Intersection (list ,@(map type->sexp elems)))]
-    [(Name: stx 0 #t)
+    [(Name: (Id stx) 0 #t)
      `(-struct-name (quote-syntax ,stx))]
-    [(Name: stx args struct?)
+    [(Name: (Id stx) args struct?)
      `(make-Name (quote-syntax ,stx) ,args ,struct?)]
-    [(fld: t acc mut)
+    [(fld: t (Id acc) mut)
      `(make-fld ,(type->sexp t) (quote-syntax ,acc) ,mut)]
-    [(Struct: name parent flds proc poly? pred-id)
+    [(Struct: (Id name) parent flds proc poly? (Id pred-id))
      `(make-Struct (quote-syntax ,name)
                    ,(and parent (type->sexp parent))
                    (list ,@(map type->sexp flds))
@@ -236,9 +236,9 @@
     [(App: rator rands)
      `(make-App ,(type->sexp rator)
                 (list ,@(map type->sexp rands)))]
-    [(Opaque: pred)
+    [(Opaque: (Id pred))
      `(make-Opaque (quote-syntax ,pred))]
-    [(Refinement: parent pred)
+    [(Refinement: parent (Id pred))
      `(make-Refinement ,(type->sexp parent) (quote-syntax ,pred))]
     [(Mu-name: n b)
      `(make-Mu (quote ,n) ,(type->sexp b))]
@@ -269,14 +269,13 @@
                   (list ,@(convert-row-clause augments))
                   ,(and init-rest (type->sexp init-rest)))]
     [(Instance: ty) `(make-Instance ,(type->sexp ty))]
-    [(Signature: name extends mapping)
+    [(Signature: (Id name) extends mapping)
      (define (serialize-mapping m)
-       (map (lambda (id/ty) 
-              (define id (car id/ty))
-              (define ty (force (cdr id/ty)))
-              `(cons (quote-syntax ,id) ,(type->sexp ty)))
+       (map (match-lambda
+              [(cons (Id id) (app force ty))
+               `(cons (quote-syntax ,id) ,(type->sexp ty))])
             m))
-     (define serialized-extends (and extends `(quote-syntax ,extends)))
+     (define serialized-extends (and extends `(quote-syntax ,(Id-val extends))))
      `(make-Signature (quote-syntax ,name)
                       ,serialized-extends
                       (list ,@(serialize-mapping mapping)))]
@@ -343,11 +342,9 @@
      `(-arg-path ,arg)]
     [(Path: null (cons depth arg))
      `(-arg-path ,arg ,depth)]
-    [(Path: pes i)
+    [(Path: pes (Id i))
      `(make-Path (list ,@(map path-elem->sexp pes))
-                 ,(if (identifier? i)
-                      `(quote-syntax ,i)
-                      `(cons ,(car i) ,(cdr i))))]))
+                 (quote-syntax ,i))]))
 
 ;; Path-Element -> SExp
 ;; Convert a path element in an object to an s-expression

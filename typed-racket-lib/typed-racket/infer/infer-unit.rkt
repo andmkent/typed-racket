@@ -43,7 +43,7 @@
 
 ;; Context, contains which type variables and indices to infer and which cannot be mentioned in
 ;; constraints.
-(define-struct/cond-contract context
+(def-struct/cond-contract context
   ([bounds (listof symbol?)]
    [vars (listof symbol?)]
    [indices (listof symbol?)]) #:transparent)
@@ -100,21 +100,21 @@
 
 ;; (CMap DMap -> Pair<CMap, DMap>) CSet -> CSet
 ;; Map a function over a constraint set
-(define (map/cset f cset)
-  (% make-cset (for/list/fail ([cmap/dmap (in-list (cset-maps cset))])
-                 (f (car cmap/dmap) (cdr cmap/dmap)))))
+(define (map/cset f cs)
+  (% cset (for/list/fail ([cmap/dmap (in-list (cset-maps cs))])
+            (f (car cmap/dmap) (cdr cmap/dmap)))))
 
 ;; Symbol DCon -> DMap
 ;; Construct a dmap containing only a single mapping
 (define (singleton-dmap dbound dcon)
-  (make-dmap (make-immutable-hash (list (cons dbound dcon)))))
+  (dmap (make-immutable-hash (list (cons dbound dcon)))))
 
 ;; Hash<K, V> Listof<K> -> Hash<K, V>
 ;; Remove all provided keys from the hash table
 (define (hash-remove* hash keys)
   (for/fold ([h hash]) ([k (in-list keys)]) (hash-remove h k)))
 
-(define (mover cset dbound vars f)
+(define (mover cs dbound vars f)
   (map/cset
    (lambda (cmap dmap)
      (when (hash-has-key? (dmap-map dmap) dbound)
@@ -126,31 +126,31 @@
           dbound
           (f cmap))
          dmap)))
-   cset))
+   cs))
 
 ;; dbound : index variable
 ;; vars : listof[type variable] - temporary variables
 ;; cset : the constraints being manipulated
 ;; takes the constraints on vars and creates a dmap entry constraining dbound to be |vars|
 ;; with the constraints that cset places on vars
-(define/cond-contract (move-vars-to-dmap cset dbound vars)
+(define/cond-contract (move-vars-to-dmap cs dbound vars)
   (cset? symbol? (listof symbol?) . -> . cset?)
-  (mover cset dbound vars
+  (mover cs dbound vars
          (λ (cmap)
-           (make-dcon (for/list ([v (in-list vars)])
-                        (hash-ref cmap v
-                                  (λ () (int-err "No constraint for new var ~a" v))))
-                      #f))))
+           (dcon (for/list ([v (in-list vars)])
+                   (hash-ref cmap v
+                             (λ () (int-err "No constraint for new var ~a" v))))
+                 #f))))
 
 ;; cset : the constraints being manipulated
 ;; var : index variable being inferred
 ;; dbound : constraining index variable
 ;;
-(define/cond-contract (move-dotted-rest-to-dmap cset var dbound)
+(define/cond-contract (move-dotted-rest-to-dmap cs var dbound)
   (cset? symbol? symbol? . -> . cset?)
-  (mover cset var null
+  (mover cs var null
          (λ (cmap)
-           (make-dcon-dotted
+           (dcon-dotted
             null
             (hash-ref cmap var
                       (λ () (int-err "No constraint for bound ~a" var)))
@@ -159,11 +159,11 @@
 ;; cset : the constraints being manipulated
 ;; vars : the variables that are the prefix of the dbound
 ;; dbound : index variable
-(define/cond-contract (move-vars+rest-to-dmap cset vars dbound #:exact [exact? #f])
+(define/cond-contract (move-vars+rest-to-dmap cs vars dbound #:exact [exact? #f])
   ((cset? (listof symbol?) symbol?) (#:exact boolean?) . ->* . cset?)
-  (mover cset dbound vars
+  (mover cs dbound vars
          (λ (cmap)
-           ((if exact? make-dcon-exact make-dcon)
+           ((if exact? dcon-exact dcon)
             (for/list ([v (in-list vars)])
               (hash-ref cmap v no-constraint))
             (hash-ref cmap dbound (λ () (int-err "No constraint for bound ~a" dbound)))))))

@@ -12,22 +12,24 @@
 (require "../../utils/utils.rkt"
          "../structures.rkt"
          "../constraints.rkt"
-         "../../rep/type-rep.rkt" ; only for contract
+         (rep ident)
          (contract-req)
          racket/match
          racket/syntax
-         syntax/private/id-table
+         syntax/id-table
          (for-syntax racket/base
                      syntax/parse))
 
+(require-for-cond-contract "../../rep/type-rep.rkt")
+
 (provide with-new-name-tables
-         name/sc:
-         lookup-name-defined
-         set-name-defined)
+         name/sc:)
 
 (provide/cond-contract
+ [lookup-name-defined (-> Id? boolean?)]
+ [set-name-defined (-> Id? void?)]
  [get-all-name-defs
-  (-> (listof (list/c (listof identifier?)
+  (-> (listof (list/c (listof Id?)
                       static-contract?
                       static-contract?
                       static-contract?)))]
@@ -43,11 +45,11 @@
 
 ;; Use this table to track whether a contract has already been
 ;; generated for this name type yet. Stores booleans.
-(define name-defined-table (make-parameter (make-free-id-table)))
+(define name-defined-table (make-parameter (make-hash)))
 
 ;; Lookup whether a contract has been defined for this name
 (define (lookup-name-defined name)
-  (free-id-table-ref (name-defined-table) name #f))
+  (hash-ref (name-defined-table) name #f))
 
 ;; Use when a contract has been defined for this name
 (define (set-name-defined name)
@@ -75,10 +77,9 @@
          [(untyped) (caddr result)])))
 
 (define (register-name-sc type typed-thunk untyped-thunk both-thunk)
-  (define-values (typed-name untyped-name both-name)
-    (values (generate-temporary)
-            (generate-temporary)
-            (generate-temporary)))
+  (define typed-name (genId))
+  (define untyped-name (genId))
+  (define both-name (genId))
   (hash-set! (name-sc-table)
              type
              (list (name-combinator null typed-name)
@@ -91,7 +92,7 @@
              type
              (list typed-sc untyped-sc both-sc)))
 
-(struct name-combinator combinator (gen-name)
+(def-struct/cond-contract name-combinator combinator ([gen-name Id?])
   #:transparent
   #:property prop:combinator-name "name/sc"
   #:methods gen:sc
@@ -99,7 +100,7 @@
    (define (sc-traverse v f)
      (void))
    (define (sc->contract v f)
-     (name-combinator-gen-name v))
+     (Id-val (name-combinator-gen-name v)))
    (define (sc->constraints v f)
      (variable-contract-restrict (name-combinator-gen-name v)))])
 

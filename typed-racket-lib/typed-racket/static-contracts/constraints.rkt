@@ -43,7 +43,7 @@
   racket/function
   racket/set
   (contract-req)
-  syntax/private/id-table
+  syntax/id-table
   "kinds.rkt"
   "equations.rkt")
 
@@ -64,7 +64,7 @@
            racket/match
            racket/list
            racket/set
-           syntax/private/id-table
+           syntax/id-table
            "kinds.rkt")
   
   (define free-id-set? free-id-table?)

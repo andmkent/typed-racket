@@ -11,25 +11,25 @@
 (export constraints^)
 
 ;; Widest constraint possible
-(define no-constraint (make-c (Un) Univ))
+(define no-constraint (c (Un) Univ))
 
 ;; Create an empty constraint map from a set of type variables X and
 ;; index variables Y.  For now, we add the widest constraints for
 ;; variables in X to the cmap and create an empty dmap.
 (define (empty-cset X Y)
-  (make-cset (list (cons (for/hash ([x (in-list X)])
-                           (values x no-constraint))
-                         (make-dmap (make-immutable-hash null))))))
+  (cset (list (cons (for/hash ([x (in-list X)])
+                      (values x no-constraint))
+                    (dmap (make-immutable-hash null))))))
 
 
 ;; add the constraints S <: var <: T to every map in cs
 (define (insert cs var S T)
   (match cs
     [(struct cset (maps))
-     (make-cset (for/list ([map-entry (in-list maps)])
-                  (match-define (cons map dmap) map-entry)
-                  (cons (hash-set map var (make-c S T))
-                        dmap)))]))
+     (cset (for/list ([map-entry (in-list maps)])
+             (match-define (cons map dmap) map-entry)
+             (cons (hash-set map var (c S T))
+                   dmap)))]))
 
 ;; meet: Type Type -> Type
 ;; intersect the given types. produces a lower bound on both, but
@@ -56,7 +56,7 @@
     [((struct c (S T)) (struct c (S* T*)))
      (let ([S (join S S*)] [T (meet T T*)])
        (and (subtype S T)
-            (make-c S T)))]))
+            (c S T)))]))
 
 ;; compute the meet of two constraint sets
 ;; returns #f for failure
@@ -76,7 +76,7 @@
                       v))
        (cond [(null? maps)
               #f]
-             [else (make-cset maps)])])]
+             [else (cset maps)])])]
     [(x . ys)
      (for/fold ([x x]) ([y (in-list ys)])
        (% cset-meet x y))]))
@@ -90,4 +90,4 @@
 ;; FIXME: should this call `remove-duplicates`?
 (define (cset-join l)
   (let ([mapss (map cset-maps l)])
-    (make-cset (apply append mapss))))
+    (cset (apply append mapss))))
