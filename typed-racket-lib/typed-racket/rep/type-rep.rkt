@@ -810,6 +810,15 @@
          [_ (loop (set-add elems t) ts)])])))
 
 
+;; general refinement w/ "arbitrary" prop refining the type
+(def-type Refine ([type Type?] [prop Prop?])
+  [#:frees (f) (combine-frees (list (f type) (f prop)))]
+  [#:fmap (f) (make-Refine (f type) (f prop))]
+  [#:for-each (f) (f type) (f prop)]
+  [#:mask (λ (t) (mask (Refine-type t)))])
+
+
+;; refinement based on some predicate function 'pred'
 (def-type Refinement ([parent Type?] [pred identifier?])
   [#:frees (f) (f parent)]
   [#:fmap (f) (make-Refinement (f parent) pred)]

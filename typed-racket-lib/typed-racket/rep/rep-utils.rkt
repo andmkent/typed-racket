@@ -8,7 +8,8 @@
          "type-mask.rkt"
          racket/stxparam
          syntax/parse/define
-         syntax/id-table
+         racket/private/dict
+         (only-in racket/dict define-custom-hash-types)
          racket/generic
          (only-in racket/unsafe/ops unsafe-struct-ref)
          (for-syntax
@@ -46,9 +47,18 @@
      (and (identifier? y) (free-identifier=? x y))]
     [else (equal? x y)]))
 
-(define id-table (make-free-id-table))
+(define-custom-hash-types fid-hash
+  free-identifier=?
+  (λ (id) (eq-hash-code (identifier-binding-symbol id))))
+
+(define id-table (make-weak-fid-hash))
 (define (normalize-id id)
-  (free-id-table-ref! id-table id id))
+  (define intern-box (dict-ref id-table id #f))
+  (cond
+    [(and intern-box (weak-box-value intern-box #f))]
+    [else
+     (dict-set! id-table id (make-weak-box id))
+     id]))
 
 (define (hash-id id)
   (eq-hash-code (identifier-binding-symbol id)))
