@@ -40,7 +40,7 @@
            (for/list ([t (in-list opt-ts)]) (-opt t))
            (for/list ([t (in-list opt-ts)]) -Boolean)
            rest-type)))
-       (list (make-arr* ts rng #:rest rest #:drest drest))]
+       (list (-Arr ts rng #:rest rest #:drest drest))]
       [else
        ;; The keyword argument types including boolean flags for
        ;; optional keyword arguments
@@ -59,7 +59,7 @@
        ;; Add boolean arguments for the optional type flaggs.
        (define opt-flags (make-list (length opt-ts) -Boolean))
 
-       (list (make-arr* (append kw-args plain-ts opt-ts opt-flags rest-type)
+       (list (-Arr (append kw-args plain-ts opt-ts opt-flags rest-type)
                         rng
                         #:drest drest))])))
 
@@ -76,38 +76,26 @@
      (-values-dots ts dty dbound)]))
 
 
-(define (prefix-of a b)
-  (define (rest-equal? a b)
-    (match* (a b)
-      [(a a) #t]
-      [(#f _) #f]
-      [(_ #f) #f]
-      [(_ _) #f]))
-  (define (drest-equal? a b)
-    (match* (a b)
-      [((list t b) (list t b)) #t]
-      [(#f #f) #t]
-      [(_ _) #f]))
-  (match* (a b)
-    [((arr: args result rest drest kws)
-      (arr: args* result* rest* drest* kws*))
-     (and (< (length args) (length args*))
-          (rest-equal? rest rest*)
-          (drest-equal? drest drest*)
-          (equal? result result*)
-          (equal? kws kws*)
-          (for/and ([p (in-list args)]
-                    [p* (in-list args*)])
-            (equal? p p*)))]))
+(define (prefix-of arrow arrow*)
+  (let ([dom (unsafe-Arrow-dom arrow)]
+        [dom* (unsafe-Arrow-dom arrow*)])
+    (and (< (length dom) (length dom*))
+         (for/and ([d  (in-list dom)]
+                   [d* (in-list dom*)])
+           (equal? d d*))
+         (equal? (unsafe-Arrow-rst arrow)
+                 (unsafe-Arrow-rst arrow*))
+         (equal? (Arrow-dotted-rst arrow)
+                 (Arrow-dotted-rst arrow*))
+         (equal? (Arrow-kws arrow)
+                 (Arrow-kws arrow*)))))
 
 (define (arity-length a)
-  (match a
-    [(arr: args _ _ _ _) (length args)]))
+  (length (unsafe-Arrow-dom a)))
 
 
 (define (arg-diff a1 a2)
-  (match a2
-    [(arr: args _ _ _ _) (drop args (arity-length a1))]))
+  (drop (unsafe-Arrow-dom a2) (arity-length a1)))
 
 (define (find-prefixes l)
   (define l* (sort l (λ (arr1 arr2) (< (arity-length arr1)
@@ -148,12 +136,15 @@
     ;; set and set->list to retain determinism
     (remove-duplicates
      (for/list ([(k v) (in-dict table)])
-       (match k
-         [(arr: mand rng rest drest kws)
-          (define kws* (if actual-kws
-                           (handle-extra-or-missing-kws kws actual-kws)
-                           kws))
-          (convert kws* mand v rng rest drest split?)]))))
+       (define mand (unsafe-Arrow-dom k))
+       (define rng (unsafe-Arrow-rng k))
+       (define rst (unsafe-Arrow-rst k))
+       (define drst (Arrow-dotted-rst k))
+       (define kws (Arrow-kws k))
+       (define kws* (if actual-kws
+                        (handle-extra-or-missing-kws kws actual-kws)
+                        kws))
+       (convert kws* mand v rng rst drst split?))))
   (apply cl->* fns))
 
 ;; kw-convert : Type (Option LambdaKeywords) [Boolean] -> Type
@@ -201,7 +192,8 @@
   (match ft
     [(Function: arrs)
      (cond [(= (length arrs) 1) ; no optional args (either kw or not)
-            (match-define (arr: doms rng _ _ _) (car arrs))
+            (define doms (unsafe-Arrow-dom (car arrs)))
+            (define rng (unsafe-Arrow-rng (car arrs)))
             (define kw-length
               (- (length doms) (+ non-kw-argc (if rest? 1 0))))
             (define-values (kw-args other-args) (split-at doms kw-length))
@@ -212,16 +204,17 @@
             (define rest-type
               (and rest? (last other-args)))
             (make-Function
-             (list (make-arr* (take other-args non-kw-argc)
-                              (erase-props/Values rng)
-                              #:kws actual-kws
-                              #:rest rest-type)))]
+             (list (-Arr (take other-args non-kw-argc)
+                         (erase-props/Values rng)
+                         #:kws actual-kws
+                         #:rest rest-type)))]
            [(and (even? (length arrs)) ; had optional args
                  (>= (length arrs) 2))
             ;; assumption: only one arr is needed, since the types for
             ;; the actual domain are the same (the difference is in the
             ;; second type for the optional keyword protocol)
-            (match-define (arr: doms rng _ _ _) (car arrs))
+            (define doms (unsafe-Arrow-dom (car arrs)))
+            (define rng (unsafe-Arrow-rng (car arrs)))
             (define kw-length
               (- (length doms) (+ non-kw-argc (if rest? 1 0))))
             (define kw-args (take doms kw-length))
@@ -234,10 +227,10 @@
             (define opt-types (take opt-and-rest-args opt-non-kw-argc))
             (make-Function
              (for/list ([to-take (in-range (add1 (length opt-types)))])
-               (make-arr* (append mand-args (take opt-types to-take))
-                          (erase-props/Values rng)
-                          #:kws actual-kws
-                          #:rest rest-type)))]
+               (-Arr (append mand-args (take opt-types to-take))
+                     (erase-props/Values rng)
+                     #:kws actual-kws
+                     #:rest rest-type)))]
            [else (int-err "unsupported arrs in keyword function type")])]
     [_ (int-err "unsupported keyword function type")]))
 
@@ -252,7 +245,7 @@
     (match f-type
       [(AnyPoly-names: _ _ (Function: arrs)) arrs]))
   (for/and ([arr (in-list arrs)])
-    (match-define (arr: _ _ _ _ kws) arr)
+    (define kws (Arrow-kws arr))
     (define-values (mand-kw-types opt-kw-types) (partition-kws kws))
     (define mand-kws (map Keyword-kw mand-kw-types))
     (define opt-kws (map Keyword-kw opt-kw-types))
@@ -304,7 +297,7 @@
 
 (define ((opt-convert-arr required-pos optional-pos) arr)
   (match arr
-    [(arr: args result #f #f '())
+    [(ArrowSimp: args result)
      (define num-args (length args))
      (and (>= num-args required-pos)
           (<= num-args (+ required-pos optional-pos))
@@ -313,16 +306,13 @@
                  [missing-opt-args (- (+ required-pos optional-pos) num-args)]
                  [present-flags (map (λ (t) (-val #t)) opt-args)]
                  [missing-args (make-list missing-opt-args (-val #f))])
-            (make-arr (append required-args
-                              opt-args
-                              missing-args
-                              present-flags
-                              missing-args)
-                      result
-                      #f
-                      #f
-                      '())))]
-    [(arr: args result _ _ _) #f]))
+            (-Arr (append required-args
+                          opt-args
+                          missing-args
+                          present-flags
+                          missing-args)
+                  result)))]
+    [(? Arrow?) #f]))
 
 (define (opt-convert ft required-pos optional-pos)
   (let loop ([ft ft])
@@ -369,7 +359,8 @@
   (match ft
     [(Function: arrs)
      (cond [(and (even? (length arrs)) (>= (length arrs) 2))
-            (match-define (arr: doms rng _ _ _) (car arrs))
+            (define doms (unsafe-Arrow-dom (car arrs)))
+            (define rng (unsafe-Arrow-rng (car arrs)))
             (define-values (mand-args opt-and-rest-args)
               (split-at doms mand-argc))
             (define rest-type
@@ -377,9 +368,9 @@
             (define opt-types (take opt-and-rest-args opt-argc))
             (make-Function
              (for/list ([to-take (in-range (add1 (length opt-types)))])
-               (make-arr* (append mand-args (take opt-types to-take))
-                          rng
-                          #:rest rest-type)))]
+               (-Arr (append mand-args (take opt-types to-take))
+                     rng
+                     #:rest rest-type)))]
            [else (int-err "unsupported arrs in keyword function type")])]
     [_ (int-err "unsupported keyword function type")]))
 

@@ -289,8 +289,7 @@
            (in-hierarchy? (resolve-once p) par)]
           [(Struct: _ (? Struct? p) _ _ _ _) (in-hierarchy? p par)]
           [(Struct: _ (Poly: _ p) _ _ _ _) (in-hierarchy? p par)]
-          [(Struct: _ #f _ _ _ _) #f]
-          [_ (int-err "what is this?!?! ~a" s)])))
+          [(Struct: _ #f _ _ _ _) #f])))
   (not (or (in-hierarchy? s1 s2) (in-hierarchy? s2 s1))))
 
 
