@@ -8,7 +8,10 @@
               free-variance rep-switch)
          (utils tc-utils)
          (only-in (env type-env-structs)
-                  with-lexical-env with-naively-extended-lexical-env lexical-env)
+                  with-lexical-env
+                  with-extended-lexical-env
+                  with-naively-extended-lexical-env
+                  lexical-env)
          (types utils resolve match-expanders current-seen
                 numeric-tower substitute prefab signatures)
          (for-syntax racket/base syntax/parse racket/sequence)
@@ -46,6 +49,14 @@
 ;; fresh identifiers.
 (define temp-objs
   (make-parameter (make-obj-seq)))
+
+(define-syntax-rule (with-fresh-obj obj . body)
+  (let-values ([(obj os-seq) (obj-seq-next (temp-objs))])
+    (parameterize ([temp-objs os-seq])
+      . body)))
+
+
+
 
 ;; is t1 a subtype of t2?
 ;; type type -> boolean
@@ -103,7 +114,7 @@
 ;; check if s is a supertype of any element of ts
 (define (supertype-of-one/arr A s ts)
   (for/or ([t (in-list ts)])
-    (arr-subtype*/no-fail A t s)))
+    (arrow-subtype* A t s)))
 
 (define-syntax (let*/and stx)
   (syntax-parse stx
@@ -175,67 +186,129 @@
        [(_ _) #f]))))
 
 
-;; combine-arrs
-;;
-;; Checks if this function is defined by an uneccessary case->
-;; matching the following pattern:
-;; τ0 -> σ ∧ τ1 -> σ ∧ τn -> σ ...
-;; and if so, returns the combined function type:
-;; (∪ τ0 τ1 ... τn)-> σ
-;; amk: would it be better to simplify function types ahead of time
-;; for cases like this where there is a preferable normal form?
-(define/cond-contract (combine-arrs arrs)
-  (-> (listof arr?) (or/c #f arr?))
-  (match arrs
-    [(list (and a1 (arr: dom1 rng1 #f #f '())) (arr: dom rng #f #f '()) ...)
-     (cond
-       [(null? dom) (make-arr dom1 rng1 #f #f '())]
-       [(not (apply = 1 (length dom1) (map length dom))) #f]
-       [(not (for/and ([rng2 (in-list rng)]) (equal? rng1 rng2)))
-        #f]
-       [else (make-arr (apply map Un (cons dom1 dom)) rng1 #f #f '())])]
-    [_ #f]))
-
 ;; simple co/contra-variance for ->
-(define/cond-contract (arr-subtype*/no-fail A arr1 arr2)
-  (-> list? arr? arr? any/c)
+(define/cond-contract (arrow-subtype* A arr1 arr2)
+  (-> list? Arrow? Arrow? any/c)
   (match* (arr1 arr2)
     ;; the really simple case
-    [((arr: dom1 rng1 #f #f '())
-      (arr: dom2 rng2 #f #f '()))
+    [((ArrowSimp: dom1 rng1)
+      (ArrowSimp: dom2 rng2))
      (subtype-seq A
                   (subtypes* dom2 dom1)
-                  (subval* (restrict-values rng1 dom2) rng2))]
-    [((arr: dom1 rng1 #f #f kws1)
-      (arr: dom2 rng2 #f #f kws2))
+                  (subval* rng1 rng2))]
+    [((ArrowStar: dom1 rst1 kws1 rng1)
+      (ArrowSimp: dom2 rng2))
      (subtype-seq A
-                  (subtypes* dom2 dom1)
-                  (kw-subtypes* kws1 kws2)
-                  (subval* (restrict-values rng1 dom2) rng2))]
-    [((arr: dom1 rng1 rest1 #f kws1)
-      (arr: dom2 rng2 #f    #f kws2))
+                  (subtypes*/varargs dom2 dom1 rst1)
+                  (kw-subtypes* kws1 '())
+                  (subval* rng1 rng2))]
+    [((? ArrowDep? arr1)
+      (ArrowSimp: dom2 rng2))
+     (and
+      (Arrow-arity-includes? arr1 (length dom2))
+      (with-fresh-ids (length (ArrowDep-dom arr1)) ids
+        (with-instantiated-ArrowDeps ids
+            ([(ArrowDep: dom1 _ rst1 rng1) arr1])
+          (with-extended-lexical-env
+              ;; (length dom2) <= (length ids)
+              [#:identifiers (take ids (length dom2))
+               #:types dom2]
+            (subtype-seq A
+                         (subtypes*/varargs dom2 dom1 rst1)
+                         (subval* rng1 rng2))))))]
+    [((ArrowSimp: dom1 rng1)
+      (ArrowStar: dom2 rst2 kws2 rng2))
+     (and (not rst2)
+          (subtype-seq A
+                       (subtypes* dom2 dom1)
+                       (kw-subtypes* '() kws2)
+                       (subval* rng1 rng2)))]
+    [((ArrowStar: dom1 rst1 kws1 rng1)
+      (ArrowStar: dom2 rst2 kws2 rng2))
      (subtype-seq A
-                  (subtypes*/varargs dom2 dom1 rest1)
+                  (subtypes*/varargs dom2 dom1 rst1)
+                  (rst/drst-subtype* rst1 rst2)
                   (kw-subtypes* kws1 kws2)
-                  (subval* (restrict-values rng1 dom2) rng2))]
-    [((arr: dom1 rng1 #f    #f kws1)
-      (arr: dom2 rng2 rest2 #f kws2))
-     #f]
-    [((arr: dom1 rng1 rest1 #f kws1)
-      (arr: dom2 rng2 rest2 #f kws2))
-     (subtype-seq A
-                  (subtypes*/varargs dom2 dom1 rest1)
-                  (subtype* rest2 rest1)
-                  (kw-subtypes* kws1 kws2)
-                  (subval* (restrict-values rng1 dom2) rng2))]
-    ;; handle ... varargs when the bounds are the same
-    [((arr: dom1 rng1 #f (cons drest1 dbound) kws1)
-      (arr: dom2 rng2 #f (cons drest2 dbound) kws2))
-     (subtype-seq A
-                  (subtype* drest2 drest1)
-                  (subtypes* dom2 dom1)
-                  (kw-subtypes* kws1 kws2)
-                  (subval* (restrict-values rng1 dom2) rng2))]
+                  (subval* rng1 rng2))]
+    [((? ArrowDep? arr1)
+      (ArrowStar: dom2 rst2 kws2 rng2))
+     (with-fresh-ids (length (ArrowDep-dom arr1)) ids
+       (with-instantiated-ArrowDeps ids
+         ([(ArrowDep: dom1 _ rst1 rng1) arr1])
+         (with-extended-lexical-env
+             [#:identifiers ids
+              #:types (cond
+                        [(>= (length dom2) (length ids)) dom2]
+                        [else (for/list ([_ (in-list ids)]
+                                         [d (in-list/rest dom2 (or rst2 Univ))])
+                                d)])]
+           (subtype-seq A
+                        (subtypes*/varargs dom2 dom1 rst1)
+                        (rst/drst-subtype* rst1 rst2)
+                        (kw-subtypes* '() kws2)
+                        (subval* rng1 rng2)))))]
+    [((ArrowSimp: dom1 rng1)
+      (? ArrowDep? arr2))
+     (with-fresh-ids (length (ArrowDep-dom arr2)) ids
+       (with-instantiated-ArrowDeps ids
+         ([(ArrowDep: dom2 _ rst2 rng2) arr2])
+         (with-extended-lexical-env
+             [#:identifiers ids
+              #:types dom2]
+           (subtype-seq A
+                        (subtypes* dom2 dom1)
+                        (rst/drst-subtype* #f rst2)
+                        (subval* rng1 rng2)))))]
+    [((ArrowStar: dom1 rst1 kws1 rng1)
+      (? ArrowDep? arr2))
+     (with-fresh-ids (length (ArrowDep-dom arr2)) ids
+       (with-instantiated-ArrowDeps ids
+         ([(ArrowDep: dom2 _ rst2 rng2) arr2])
+         (with-extended-lexical-env
+             [#:identifiers ids
+              #:types dom2]
+           (subtype-seq A
+                        (subtypes*/varargs dom2 dom1 rst1)
+                        (rst/drst-subtype* rst1 rst2)
+                        (kw-subtypes* kws1 '())
+                        (subval* rng1 rng2)))))]
+    [((? ArrowDep? arr1)
+      (? ArrowDep? arr2))
+     (and
+      ;; this first conjunct is overly conservative, but it is
+      ;; definitely sound and as we figure out the right thing
+      ;; to do, making this more permissive shouldn't break things
+      (equal? (ArrowDep-dom-deps arr1)
+              (ArrowDep-dom-deps arr2))
+      (let ([k (max (length (ArrowDep-dom arr1))
+                    (length (ArrowDep-dom arr2)))])
+        (with-fresh-ids k ids
+          (with-instantiated-ArrowDeps ids
+            ([(ArrowDep: dom1 _ rst1 rng1) arr1]
+             [(ArrowDep: dom2 _ rst2 rng2) arr2])
+            (with-extended-lexical-env
+                [#:identifiers ids
+                 #:types (cond
+                           [(eqv? (length dom2) k) dom2]
+                           [else (for/list ([_ (in-range k)]
+                                            [d (in-list/rest dom2 (or rst2 Univ))])
+                                   d)])]
+              (subtype-seq A
+                           (subtypes*/varargs dom2 dom1 rst1)
+                           (rst/drst-subtype* rst1 rst2)
+                           (subval* rng1 rng2)))))))]))
+
+
+(define (rst/drst-subtype* A rst1 rst2)
+  (match* (rst1 rst2)
+    [(_ _) #:when (eq? rst1 rst2) #t]
+    [((? Type? t1)
+      (? Type? t2))
+     (subtype* A t2 t1)]
+    [((RestDots: t1 d1)
+      (RestDots: t2 d2))
+     (and (eq? d1 d2)
+          (subtype* A t2 t1))]
     [(_ _) #f]))
 
 
@@ -372,11 +445,6 @@
   (subtype-seq A
                (subtype* t1 t2)
                (subtype* t2 t1)))
-
-(define-syntax-rule (with-fresh-obj obj . body)
-  (let-values ([(obj os) (obj-seq-next (temp-objs))])
-    (parameterize ([temp-objs os])
-      . body)))
 
 ;; the algorithm for recursive types transcribed directly from TAPL, pg 305
 ;; List[(cons Number Number)] type type -> List[(cons Number Number)] or #f
@@ -627,13 +695,6 @@
      [_ (continue<: A t1 t2 obj)])]
   [(case: Function (Function: arrs1))
    (match t2
-     ;; special-case for case-lambda/union with only one argument              
-     [(Function: (list arr2))
-      (cond [(null? arrs1) #f]
-            [else
-             (define comb (combine-arrs arrs1))
-             (or (and comb (arr-subtype*/no-fail A comb arr2))
-                 (supertype-of-one/arr A arr2 arrs1))])]
      ;; case-lambda
      [(Function: arrs2)
       (if (null? arrs1) #f

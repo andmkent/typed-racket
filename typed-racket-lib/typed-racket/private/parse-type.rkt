@@ -3,11 +3,10 @@
 ;; This module provides functions for parsing types written by the user
 
 (require (rename-in "../utils/utils.rkt" [infer infer-in])
-         (except-in (rep core-rep type-rep object-rep rep-utils) make-arr)
-         (rename-in (types abbrev utils prop-ops resolve
-                           classes prefab signatures
-                           subtype path-type numeric-tower)
-                    [make-arr* make-arr])
+         (rep core-rep type-rep object-rep rep-utils)
+         (types abbrev utils prop-ops resolve
+                classes prefab signatures
+                subtype path-type numeric-tower)
          (only-in (infer-in infer) intersect)
          (utils tc-utils stxclass-util literal-syntax-class)
          syntax/stx (prefix-in c: (contract-req))
@@ -461,7 +460,7 @@
            #:fail-unless (< arg (length doms))
            (format "Proposition's object index ~a is larger than argument length ~a"
                    arg (length doms))
-           #:attr obj (-arg-path arg 0))
+           #:attr obj (-id-path (cons 0 arg)))
   (pattern (~seq depth-idx:nat idx:nat)
            #:do [(define arg (syntax-e #'idx))
                  (define depth (syntax-e #'depth-idx))]
@@ -475,7 +474,7 @@
            #:fail-unless (< arg actual-arg)
            (format "Proposition's object index ~a is larger than argument length ~a"
                    depth actual-arg)
-           #:attr obj (-arg-path arg (syntax-e #'depth-idx))))
+           #:attr obj (-id-path (cons (syntax-e #'depth-idx) arg))))
 
 
 (define-syntax-class object
@@ -518,7 +517,7 @@
        (parse-object-type stx)]
       [(:Refinement^ p?:id)
        (match (lookup-id-type/lexical #'p?)
-         [(and t (Function: (list (arr: (list dom) _ #f #f '()))))
+         [(and t (Function: (list (ArrowSimp: (list dom) _))))
           (make-Refinement dom #'p?)]
          [t (parse-error "expected a predicate for argument to Refinement"
                          "given" t)])]
@@ -611,7 +610,7 @@
       [(:cons^ fst rst)
        (-pair (parse-type #'fst) (parse-type #'rst))]
       [(:pred^ t)
-       (make-pred-ty (parse-type #'t))]
+       (pred-> (parse-type #'t))]
       [(:case->^ tys ...)
        (make-Function
         (for/list ([ty (in-syntax #'(tys ...))])
@@ -689,24 +688,23 @@
          (let ([doms (for/list ([d (in-list doms)])
                        (parse-type d))])
            (make-Function
-            (list (make-arr
-                   doms
-                   (parse-type (syntax/loc stx (rest-dom ...))))))))]
+            (list (-Arr doms (parse-type (syntax/loc stx (rest-dom ...))))))))]
       [(~or (:->^ dom rng :colon^ latent:simple-latent-prop)
             (dom :->^ rng :colon^ latent:simple-latent-prop))
        ;; use parse-type instead of parse-values-type because we need to add the props from the pred-ty
        (with-arity 1
-         (make-pred-ty (list (parse-type #'dom)) (parse-type #'rng) (attribute latent.type)
-                       (-acc-path (attribute latent.path) (-arg-path 0))))]
+         (pred-> ([x : (parse-type #'dom)])
+                 (parse-type #'rng)
+                 (attribute latent.type)
+                 (make-Path (attribute latent.path) x)))]
       [(~or (:->^ dom:non-keyword-ty ... kws:keyword-tys ... rest:non-keyword-ty ddd:star rng)
             (dom:non-keyword-ty ... kws:keyword-tys ... rest:non-keyword-ty ddd:star :->^ rng))
        (with-arity (length (syntax->list #'(dom ...)))
          (make-Function
-          (list (make-arr
-                 (parse-types #'(dom ...))
-                 (parse-values-type #'rng)
-                 #:rest (parse-type #'rest)
-                 #:kws (map force (attribute kws.Keyword))))))]
+          (list (-Arr (parse-types #'(dom ...))
+                      (parse-values-type #'rng)
+                      #:rest (parse-type #'rest)
+                      #:kws (map force (attribute kws.Keyword))))))]
       [(~or (:->^ dom:non-keyword-ty ... rest:non-keyword-ty :ddd/bound rng)
             (dom:non-keyword-ty ... rest:non-keyword-ty :ddd/bound :->^ rng))
        (with-arity (length (syntax->list #'(dom ...)))
@@ -745,10 +743,8 @@
          (let ([doms (for/list ([d (in-list doms)])
                        (parse-type d))])
            (make-Function
-            (list (make-arr
-                   doms
-                   (parse-values-type #'rng)
-                   #:kws (map force (attribute kws.Keyword)))))))]
+            (list (-Arr doms (parse-values-type #'rng)
+                        #:kws (map force (attribute kws.Keyword)))))))]
       ;; This case needs to be at the end because it uses cut points to give good error messages.
       [(~or (:->^ ~! dom:non-keyword-ty ... rng:expr
                   :colon^ (~var latent (full-latent (syntax->list #'(dom ...)))))
@@ -756,10 +752,10 @@
                                 ~! :colon^ (~var latent (full-latent (syntax->list #'(dom ...))))))
        ;; use parse-type instead of parse-values-type because we need to add the props from the pred-ty
        (with-arity (length (syntax->list #'(dom ...)))
-         (->* (parse-types #'(dom ...))
-              (parse-type #'rng)
-              : (-PS (attribute latent.positive) (attribute latent.negative))
-              : (attribute latent.object)))]
+         (-Arr (parse-types #'(dom ...))
+               (parse-type #'rng)
+              #:props (-PS (attribute latent.positive) (attribute latent.negative))
+              #:object (attribute latent.object)))]
       [(:->*^ (~var mand (->*-args #t))
               (~optional (~var opt (->*-args #f))
                          #:defaults ([opt.doms null] [opt.kws null]))

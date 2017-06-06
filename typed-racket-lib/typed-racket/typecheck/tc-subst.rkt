@@ -27,12 +27,7 @@
                   tc-results/c
                   tc-results/c)])
 
-(provide subst-rep
-         instantiate-rep/obj)
-
-
-(define (instantiate-rep/obj rep obj [t Univ])
-  (subst-rep rep (list (list (cons 0 0) obj t))))
+(provide subst-rep)
 
 
 ;; Substitutes the given objects into the values and turns it into a
@@ -120,16 +115,6 @@
    (subst-rep r-o targets)))
 
 
-;; inc-lvls
-;; This function increments the 'lvl' field in all of the targets
-;; and objects of substitution (see 'inc-lvl' above)
-(define (inc-lvls targets)
-  (for/list ([tgt (in-list targets)])
-    (match tgt
-      [(list nm1 (Path: flds nm2) ty)
-       (list (inc-lvl nm1) (make-Path flds (inc-lvl nm2)) ty)]
-      [(cons nm1 rst)
-       (cons (inc-lvl nm1) rst)])))
 
 ;; Simple substitution of objects into a Rep
 ;; This is basically 'rep[x ↦ o]'.
@@ -141,37 +126,28 @@
 (define/cond-contract (subst-rep rep targets)
   (-> any/c (listof (list/c name-ref/c OptObject? Type?))
       any/c)
-  (define (subst/inc rep)
-    (subst-rep rep (inc-lvls targets)))
   ;; substitution loop
-  (let subst ([rep rep])
+  (let rec/lvl ([rep rep] [lvl 0])
+    (define (rec rep) (rec/lvl rep lvl))
+    (define (rec/inc rep) (rec/lvl rep (add1 lvl)))
     (match rep
       ;; Functions
       ;; increment the level of the substituted object
-      [(arr: dom rng rest drest kws)
-       (make-arr (map subst dom)
-                 (subst/inc rng)
-                 (and rest (subst rest))
-                 (and drest (cons (subst (car drest)) (cdr drest)))
-                 (map subst kws))]
+      [(ArrowDep: dom deps rst rng)
+       (make-ArrowDep
+        (for/list ([d (in-list dom)]) (rec/inc d))
+        deps
+        (and rst (rec/inc rst))
+        (rec/inc rng))]
       [(Intersection: ts raw-prop)
-       (-refine (make-Intersection (map subst ts))
-                (subst/inc raw-prop))]
-      [(Path: flds nm)
-       (let ([flds (map subst flds)])
-         (cond
-           [(assoc nm targets name-ref=?)
-            =>
-            (λ (l) (match (second l)
-                     [(Empty:) -empty-obj]
-                     [(Path: flds* nm*)
-                      (make-Path (append flds flds*) nm*)]
-                     [(? LExp? l) #:when (null? flds) l]
-                     [_ -empty-obj]))]
-           [else (make-Path flds nm)]))]
+       (-refine (make-Intersection (map rec ts))
+                (rec/inc raw-prop))]
+      ;; TODO (next 2 cases)
       ;; restrict with the type for results and props
       [(TypeProp: (and obj (Path: flds nm)) obj-ty)
-       (let ([flds (map subst flds)])
+       (error 'TODO)
+       #;
+       (let ([flds (map rec flds)])
          (cond
            [(assoc nm targets name-ref=?) =>
             (match-lambda
@@ -188,9 +164,11 @@
                  [(? LExp? l) (if (null? flds)
                                   (-is-type l new-obj-ty)
                                   -ff)])])]
-           [else (-is-type (make-Path flds nm) (subst obj-ty))]))]
+           [else (-is-type (make-Path flds nm) (rec obj-ty))]))]
       [(NotTypeProp: (and obj (Path: flds nm)) neg-obj-ty)
-       (let ([flds (map subst flds)])
+       (error 'TODO)
+       #;
+       (let ([flds (map rec flds)])
          (cond
            [(assoc nm targets name-ref=?)
             =>
@@ -210,6 +188,6 @@
                                   (-not-type l new-neg-obj-ty)
                                   -ff)])])]
            [else
-            (-not-type (make-Path flds nm) (subst neg-obj-ty))]))]
+            (-not-type (make-Path flds nm) (rec neg-obj-ty))]))]
       ;; else default fold over subfields
-      [_ (Rep-fmap rep subst)])))
+      [_ (Rep-fmap rep rec)])))

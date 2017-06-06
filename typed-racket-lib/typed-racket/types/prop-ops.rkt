@@ -414,22 +414,24 @@
 ;; ands the given type prop to both sides of the given arr for each argument
 ;; useful to express properties of the form: if this function returns at all,
 ;; we learn this about its arguments (like fx primitives, or car/cdr, etc.)
-(define/match (add-unconditional-prop-all-args arr type)
-  [((Function: (list (arr: dom rng rest drest kws))) type)
-   (match rng
-     [(Values: (list (Result: tp (PropSet: -true-prop -false-prop) op)))
-      (let ([new-props (apply -and (build-list (length dom)
-                                               (lambda (i)
-                                                 (-is-type i type))))])
-        (make-Function
-         (list (make-arr
-                dom
-                (make-Values
-                 (list (-result tp
-                                (-PS (-and -true-prop new-props)
-                                     (-and -false-prop new-props))
-                                op)))
-                rest drest kws))))])])
+(define (add-unconditional-prop-all-args f-ty type)
+  (define (add-to-range n rng)
+    (match rng
+      [(Values: (list (Result: tp (PropSet: -true-prop -false-prop) op)))
+       (let ([new-props (apply -and (build-list n (λ (i) (-is-type i type))))])
+         (make-Values
+          (list (-result tp
+                         (-PS (-and -true-prop new-props)
+                              (-and -false-prop new-props))
+                         op))))]))
+  (match f-ty
+    [(Function: (list (ArrowSimp: dom rng)))
+     (make-Function (list (-Arr dom (add-to-range (length dom) rng))))]
+    [(Function: (list (ArrowStar: dom rst kws rng)))
+     (make-Function (list (-Arr dom (add-to-range (length dom) rng)
+                                #:rest rst)))]
+    [(Function: (list (ArrowDep: dom deps rst rng)))
+     (make-Function (list (-Arr dom deps rst (add-to-range (length dom) rng))))]))
 
 ;; tc-results/c -> tc-results/c
 (define/match (erase-props tc)

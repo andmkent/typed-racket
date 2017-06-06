@@ -368,22 +368,31 @@
           (cgen/seq (context-add context #:bounds (list dbound)) (seq ss (uniform-end s-dty)) t-seq))])]))
 
 (define/cond-contract (cgen/arr context s-arr t-arr)
-  (context? arr? arr? . -> . (or/c #f cset?))
-  (match* (s-arr t-arr)
-    [((arr: ss s s-rest s-drest s-kws) (arr: ts t t-rest t-drest t-kws))
-     (define (rest->end rest drest)
+  (context? Arrow? Arrow? . -> . (or/c #f cset?))
+  (cond
+    [(or (Arrow-has-dependent-dom? s-arr)
+         (Arrow-has-dependent-dom? t-arr)
+         (not (null? (Arrow-kws s-arr)))
+         (not (null? (Arrow-kws t-arr))))
+     #f]
+    [else
+     (define (rest->end arr)
        (cond
-         [rest (uniform-end rest)]
-         [drest (dotted-end (car drest) (cdr drest))]
+         [(unsafe-Arrow-rst arr) => uniform-end]
+         [(Arrow-dotted-rst arr)
+          => (match-lambda
+               [(RestDots: dty dbound)
+                (dotted-end dty dbound)])]
          [else (null-end)]))
-
-     (define s-seq (seq ss (rest->end s-rest s-drest)))
-     (define t-seq (seq ts (rest->end t-rest t-drest)))
-     (and (null? s-kws)
-          (null? t-kws)
-          (% cset-meet
-           (cgen context s t)
-           (cgen/seq context t-seq s-seq)))]))
+     (% cset-meet
+        (cgen context
+              (unsafe-Arrow-rng s-arr)
+              (unsafe-Arrow-rng t-arr))
+        (cgen/seq context
+                  (seq (unsafe-Arrow-dom t-arr)
+                       (rest->end t-arr))
+                  (seq (unsafe-Arrow-dom s-arr)
+                       (rest->end s-arr))))]))
 
 (define/cond-contract (cgen/flds context flds-s flds-t)
   (context? (listof fld?) (listof fld?)  . -> . (or/c #f cset?))

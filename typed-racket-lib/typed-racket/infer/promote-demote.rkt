@@ -36,22 +36,23 @@
   ;; Returns the changed arr or #f if there is no arr above it
   (define (arr-change arr)
     (match arr
-      [(arr: dom rng rest drest kws)
-       (cond
-         [(apply V-in? V (get-propsets rng))
-          #f]
-         [(and drest (memq (cdr drest) V))
-          (make-arr (map contra dom)
-                    (co rng)
-                    (contra (car drest))
-                    #f
-                    (map contra kws))]
-         [else
-          (make-arr (map contra dom)
-                    (co rng)
-                    (and rest (contra rest))
-                    (and drest (cons (contra (car drest)) (cdr drest)))
-                    (map contra kws))])]))
+      [_ #:when (apply V-in? V (get-propsets (unsafe-Arrow-rng arr))) #f]
+      [(ArrowSimp: dom rng) (make-ArrowSimp (map contra dom) (co rng))]
+      [(ArrowStar: dom rst kws rng)
+       (let ([rst (match rst
+                    [(RestDots: (app contra dty) dbound)
+                     (if (memq dbound V) dty (make-RestDots dty dbound))]
+                    [(? Type?) (contra rst)]
+                    [_ #f])])
+         (make-ArrowStar (map contra dom)
+                         rst
+                         (map contra kws)
+                         (co rng)))]
+      [(ArrowDep: dom deps rst rng)
+       (make-ArrowStar (map contra dom)
+                       deps
+                       (and rst (contra rst))
+                       (co rng))]))
   (match cur
     [(app Rep-variances variances) #:when variances 
      (define mk (Rep-constructor cur))

@@ -7,7 +7,7 @@
          ;; dict ops only used for convenient printing
          ;; (e.g. performance is irrelevant)
          (only-in racket/dict dict->list dict-map)
-         (rep core-rep object-rep)
+         (rep core-rep object-rep type-rep)
          (for-syntax racket/base syntax/parse))
 
 (require-for-cond-contract (rep type-rep prop-rep))
@@ -48,7 +48,8 @@
 
 (provide lexical-env
          with-lexical-env
-         with-naively-extended-lexical-env)
+         with-naively-extended-lexical-env
+         with-extended-lexical-env)
 
 (define empty-env
   (env
@@ -72,6 +73,26 @@
         . body)
      (syntax/loc stx
        (with-lexical-env (env-replace-props (lexical-env) (append ps (env-props (lexical-env)))) . body))]))
+
+;; run code in an extended env
+(define-syntax (with-extended-lexical-env stx)
+  (syntax-parse stx
+    [(_ [#:identifiers ids:expr
+         #:types tys:expr
+         (~optional (~seq #:aliased-objects objs:expr)
+                    #:defaults ([objs #'#f]))]
+        . body)
+     (syntax/loc stx
+       (let ([idents ids]
+             [types tys])
+         (let ([ps (apply append
+                          (for*/list ([(id ty) (in-parallel (in-list idents) (in-list types))]
+                                      [props (in-value (extract-props (-id-path id) ty))]
+                                      #:unless (null? props))
+                            props))])
+           (with-lexical-env (env-replace-props (env-extend/bindings (lexical-env) ids tys objs)
+                                                (append ps (env-props (lexical-env))))
+             . body))))]))
 
 
 (define (env-replace-props e props)

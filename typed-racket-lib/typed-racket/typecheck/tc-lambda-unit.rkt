@@ -72,14 +72,14 @@
         (values #f #f)))
 
   (define rest-types
-    (cond
-      [(not rest) (list)]
-      [(cons? rest) (list (make-ListDots (car rest) (cdr rest)))]
+    (match rest
+      [#f (list)]
+      [(RestDots: dty db) (list (make-ListDots dty db))]
       [else (list (-lst rest))]))
   (define rest-names
     (if rest-id (list rest-id) null))
 
-  (make-arr*
+  (-Arr
    arg-types
    (abstract-results
     (with-extended-lexical-env
@@ -87,8 +87,7 @@
        #:types (append rest-types arg-types)]
       (tc-body/check body expected))
     arg-names #:rest-id rest-id)
-   #:rest (and (Type? rest) rest)
-   #:drest (and (cons? rest) rest)))
+   #:rest rest))
 
 ;; check-clause: Checks that a lambda clause has arguments and body matching the expected type
 ;; arg-list: The identifiers of the positional args in the lambda form
