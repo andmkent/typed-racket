@@ -71,13 +71,15 @@
   ;; simple case useful with equality predicates.
   ;; if the equality is true, we know that general arg is in fact of specific type.
   (define (commutative-equality/prop general specific)
-    (list (-> general specific B : (-PS (-is-type 0 specific) -tt))
-          (-> specific general B : (-PS (-is-type 1 specific) -tt))))
+    (list (-> ([x : general] [y : specific]) B : (-PS (-is-type x specific) -tt))
+          (-> ([x : specific] [y : general]) B : (-PS (-is-type y specific) -tt))))
 
   ;; if in addition if the equality is false, we know that general arg is not of the specific type.
   (define (commutative-equality/strict-prop general specific)
-    (list (-> general specific B : (-PS (-is-type 0 specific) (-not-type 0 specific)))
-          (-> specific general B : (-PS (-is-type 1 specific) (-not-type 1 specific)))))
+    (list (-> ([x : general] [y : specific]) B
+              : (-PS (-is-type x specific) (-not-type x specific)))
+          (-> ([x : specific] [y : general]) B : (-PS (-is-type y specific)
+                                                      (-not-type y specific)))))
 
 
   (define round-type ; also used for truncate
@@ -118,8 +120,8 @@
   (define fx+-type
     (lambda ()
       (fx-from-cases
-       (-> -Zero -Int -Fixnum : -true-propset : (-arg-path 1))
-       (-> -Int -Zero -Fixnum : -true-propset : (-arg-path 0))
+       (-> ([x : -Zero] [y : -Int]) -Fixnum : -true-propset : (-id-path y))
+       (-> ([x : -Int] [y : -Zero]) -Fixnum : -true-propset : (-id-path x))
        (commutative-binop -PosByte -Byte -PosIndex)
        (binop -Byte -Index)
        ;; in other cases, either we stay within fixnum range, or we error
@@ -132,7 +134,7 @@
   (define fx--type
     (lambda ()
       (fx-from-cases
-       (-> -Int -Zero -Fixnum : -true-propset : (-arg-path 0))
+       (-> ([x : -Int] [y : -Zero]) -Fixnum : -true-propset : (-id-path x))
        (-One -One . -> . -Zero)
        (-PosByte -One . -> . -Byte)
        (-PosIndex -One . -> . -Index)
@@ -147,8 +149,8 @@
   (define fx*-type
     (lambda ()
       (fx-from-cases
-       (-> -One -Int -Fixnum : -true-propset : (-arg-path 1))
-       (-> -Int -One -Fixnum : -true-propset : (-arg-path 0))
+       (-> ([x : -One] [y : -Int]) -Fixnum : -true-propset : (-id-path y))
+       (-> ([x : -Int] [y : -One]) -Fixnum : -true-propset : (-id-path x))
        (commutative-binop -Int -Zero)
        (-PosByte -PosByte . -> . -PosIndex)
        (-Byte -Byte . -> . -Index)
@@ -163,7 +165,7 @@
     (lambda ()
       (fx-from-cases
        (-Zero -Int . -> . -Zero)
-       (-> -Int -One -Fixnum : -true-propset : (-arg-path 0))
+       (-> ([x : -Int] [y : -One]) -Fixnum : -true-propset : (-id-path x))
        (-Byte -Nat . -> . -Byte)
        (-Index -Nat . -> . -Index)
        (-Nat -Nat . -> . -NonNegFixnum)
@@ -193,7 +195,7 @@
   (define fxabs-type
     (lambda ()
       (fx-from-cases
-       (-> -Nat -NonNegFixnum : -true-propset : (-arg-path 0))
+       (-> ([x : -Nat]) -NonNegFixnum : -true-propset : (-id-path x))
        ((Un -PosInt -NegInt) . -> . -PosFixnum)
        (-Int . -> . -NonNegFixnum))))
   (define fx=-type
@@ -207,119 +209,119 @@
   (define fx<-type
     (lambda ()
       (fx-from-cases
-       (-> -Int -One B : (-PS (-is-type 0 -NonPosFixnum) (-is-type 0 -PosFixnum)))
-       (-> -Int -Zero B : (-PS (-is-type 0 -NegFixnum) (-is-type 0 -NonNegFixnum)))
-       (-> -Zero -Int B : (-PS (-is-type 1 -PosFixnum) (-is-type 1 -NonPosFixnum)))
+       (-> ([x : -Int] [y : -One]) B : (-PS (-is-type x -NonPosFixnum) (-is-type x -PosFixnum)))
+       (-> ([x : -Int] [y : -Zero]) B : (-PS (-is-type x -NegFixnum) (-is-type x -NonNegFixnum)))
+       (-> ([x : -Zero] [y : -Int]) B : (-PS (-is-type y -PosFixnum) (-is-type y -NonPosFixnum)))
 
-       (-> -Byte -PosByte B : (-PS -tt (-is-type 0 -PosByte)))
-       (-> -Byte -Byte B : (-PS (-is-type 1 -PosByte) -tt))
-       (-> -Pos -Byte B : (-PS (-and (-is-type 0 -PosByte) (-is-type 1 -PosByte)) -tt))
-       (-> -Byte -Pos B : (-PS -tt (-and (-is-type 0 -PosByte) (-is-type 1 -PosByte))))
-       (-> -Byte -Nat B : (-PS -tt (-is-type 1 -Byte)))
-       (-> -Index -PosIndex B : (-PS -tt (-is-type 0 -PosIndex)))
-       (-> -Index -Index B : (-PS (-is-type 1 -PosIndex) -tt))
-       (-> -Pos -Index B : (-PS (-and (-is-type 0 -PosIndex) (-is-type 1 -PosIndex)) -tt))
-       (-> -Index -Pos B : (-PS -tt (-and (-is-type 0 -PosIndex) (-is-type 1 -PosIndex))))
-       (-> -Nat -Byte B : (-PS (-and (-is-type 0 -Byte) (-is-type 1 -PosByte)) -tt))
-       (-> -Nat -Index B : (-PS (-and (-is-type 0 -Index) (-is-type 1 -PosIndex)) -tt))
-       (-> -Index -Nat B : (-PS -tt (-is-type 1 -Index)))
+       (-> ([x : -Byte] [y : -PosByte]) B : (-PS -tt (-is-type x -PosByte)))
+       (-> ([x : -Byte] [y : -Byte]) B : (-PS (-is-type y -PosByte) -tt))
+       (-> ([x : -Pos] [y : -Byte]) B : (-PS (-and (-is-type x -PosByte) (-is-type y -PosByte)) -tt))
+       (-> ([x : -Byte] [y : -Pos]) B : (-PS -tt (-and (-is-type x -PosByte) (-is-type y -PosByte))))
+       (-> ([x : -Byte] [y : -Nat]) B : (-PS -tt (-is-type y -Byte)))
+       (-> ([x : -Index] [y : -PosIndex]) B : (-PS -tt (-is-type x -PosIndex)))
+       (-> ([x : -Index] [y : -Index]) B : (-PS (-is-type y -PosIndex) -tt))
+       (-> ([x : -Pos] [y : -Index]) B : (-PS (-and (-is-type x -PosIndex) (-is-type y -PosIndex)) -tt))
+       (-> ([x : -Index] [y : -Pos]) B : (-PS -tt (-and (-is-type x -PosIndex) (-is-type y -PosIndex))))
+       (-> ([x : -Nat] [y : -Byte]) B : (-PS (-and (-is-type x -Byte) (-is-type y -PosByte)) -tt))
+       (-> ([x : -Nat] [y : -Index]) B : (-PS (-and (-is-type x -Index) (-is-type y -PosIndex)) -tt))
+       (-> ([x : -Index] [y : -Nat]) B : (-PS -tt (-is-type y -Index)))
        ;; general integer cases
-       (-> -Int -PosInt B : (-PS -tt (-is-type 0 -PosFixnum)))
-       (-> -Int -Nat B : (-PS -tt (-is-type 0 -NonNegFixnum)))
-       (-> -Nat -Int B : (-PS (-is-type 1 -PosFixnum) -tt))
-       (-> -Int -NonPosInt B : (-PS (-is-type 0 -NegFixnum) -tt))
-       (-> -NegInt -Int B : (-PS -tt (-is-type 1 -NegFixnum)))
-       (-> -NonPosInt -Int B : (-PS -tt (-is-type 1 -NonPosFixnum)))
+       (-> ([x : -Int] [y : -PosInt]) B : (-PS -tt (-is-type x -PosFixnum)))
+       (-> ([x : -Int] [y : -Nat]) B : (-PS -tt (-is-type x -NonNegFixnum)))
+       (-> ([x : -Nat] [y : -Int]) B : (-PS (-is-type y -PosFixnum) -tt))
+       (-> ([x : -Int] [y : -NonPosInt]) B : (-PS (-is-type x -NegFixnum) -tt))
+       (-> ([x : -NegInt] [y : -Int]) B : (-PS -tt (-is-type y -NegFixnum)))
+       (-> ([x : -NonPosInt] [y : -Int]) B : (-PS -tt (-is-type y -NonPosFixnum)))
        (comp -Int))))
   (define fx>-type
     (lambda ()
       (fx-from-cases
-       (-> -One -Int B : (-PS (-is-type 1 -NonPosFixnum) (-is-type 1 -PosFixnum)))
-       (-> -Zero -Int B : (-PS (-is-type 1 -NegFixnum) (-is-type 1 -NonNegFixnum)))
-       (-> -Int -Zero  B : (-PS (-is-type 0 -PosFixnum) (-is-type 0 -NonPosFixnum)))
+       (-> ([x : -One] [y : -Int]) B : (-PS (-is-type y -NonPosFixnum) (-is-type y -PosFixnum)))
+       (-> ([x : -Zero] [y : -Int]) B : (-PS (-is-type y -NegFixnum) (-is-type y -NonNegFixnum)))
+       (-> ([x : -Int] [y : -Zero])  B : (-PS (-is-type x -PosFixnum) (-is-type x -NonPosFixnum)))
 
-       (-> -PosByte -Byte B : (-PS -tt (-is-type 1 -PosByte)))
-       (-> -Byte -Byte B : (-PS (-is-type 0 -PosByte) -tt))
-       (-> -Byte -Pos B : (-PS (-and (-is-type 0 -PosByte) (-is-type 1 -PosByte)) -tt))
-       (-> -Pos -Byte B : (-PS -tt (-and (-is-type 0 -PosByte) (-is-type 1 -PosByte))))
-       (-> -Byte -Nat B : (-PS (-and (-is-type 0 -PosByte) (-is-type 1 -Byte)) -tt))
-       (-> -PosIndex -Index B : (-PS -tt (-is-type 1 -PosIndex)))
-       (-> -Index -Index B : (-PS (-is-type 0 -PosIndex) -tt))
-       (-> -Index -Pos B : (-PS (-and (-is-type 0 -PosIndex) (-is-type 1 -PosIndex)) -tt))
-       (-> -Pos -Index B : (-PS -tt (-and (-is-type 0 -PosIndex) (-is-type 1 -PosIndex))))
-       (-> -Index -Nat B : (-PS (-and (-is-type 0 -PosIndex) (-is-type 1 -Index)) -tt))
-       (-> -Nat -Byte B : (-PS -tt (-is-type 0 -Byte)))
-       (-> -Nat -Index B : (-PS -tt (-is-type 0 -Index)))
+       (-> ([x : -PosByte] [y : -Byte]) B : (-PS -tt (-is-type y -PosByte)))
+       (-> ([x : -Byte] [y : -Byte]) B : (-PS (-is-type x -PosByte) -tt))
+       (-> ([x : -Byte] [y : -Pos]) B : (-PS (-and (-is-type x -PosByte) (-is-type y -PosByte)) -tt))
+       (-> ([x : -Pos] [y : -Byte]) B : (-PS -tt (-and (-is-type x -PosByte) (-is-type y -PosByte))))
+       (-> ([x : -Byte] [y : -Nat]) B : (-PS (-and (-is-type x -PosByte) (-is-type y -Byte)) -tt))
+       (-> ([x : -PosIndex] [y : -Index]) B : (-PS -tt (-is-type y -PosIndex)))
+       (-> ([x : -Index] [y : -Index]) B : (-PS (-is-type x -PosIndex) -tt))
+       (-> ([x : -Index] [y : -Pos]) B : (-PS (-and (-is-type x -PosIndex) (-is-type y -PosIndex)) -tt))
+       (-> ([x : -Pos] [y : -Index]) B : (-PS -tt (-and (-is-type x -PosIndex) (-is-type y -PosIndex))))
+       (-> ([x : -Index] [y : -Nat]) B : (-PS (-and (-is-type x -PosIndex) (-is-type y -Index)) -tt))
+       (-> ([x : -Nat] [y : -Byte]) B : (-PS -tt (-is-type x -Byte)))
+       (-> ([x : -Nat] [y : -Index]) B : (-PS -tt (-is-type x -Index)))
        ;; general integer cases
-       (-> -PosInt -Int B : (-PS -tt (-is-type 1 -PosFixnum)))
-       (-> -Nat -Int B : (-PS -tt (-is-type 1 -NonNegFixnum)))
-       (-> -Int -Nat B : (-PS (-is-type 0 -PosFixnum) -tt))
-       (-> -NonPosInt -Int B : (-PS (-is-type 1 -NegFixnum) -tt))
-       (-> -Int -NegInt B : (-PS -tt (-is-type 0 -NegFixnum)))
-       (-> -Int -NonPosInt B : (-PS -tt (-is-type 0 -NonPosFixnum)))
+       (-> ([x : -PosInt] [y : -Int]) B : (-PS -tt (-is-type y -PosFixnum)))
+       (-> ([x : -Nat] [y : -Int]) B : (-PS -tt (-is-type y -NonNegFixnum)))
+       (-> ([x : -Int] [y : -Nat]) B : (-PS (-is-type x -PosFixnum) -tt))
+       (-> ([x : -NonPosInt] [y : -Int]) B : (-PS (-is-type y -NegFixnum) -tt))
+       (-> ([x : -Int] [y : -NegInt]) B : (-PS -tt (-is-type x -NegFixnum)))
+       (-> ([x : -Int] [y : -NonPosInt]) B : (-PS -tt (-is-type x -NonPosFixnum)))
        (comp -Int))))
   (define fx<=-type
     (lambda ()
       (fx-from-cases
-       (-> -Int -One B : (-PS (-is-type 0 (Un -NonPosFixnum -One)) (-is-type 0 -PosFixnum)))
-       (-> -One -Int B : (-PS (-is-type 1 -PosFixnum) (-is-type 1 -NonPosFixnum)))
-       (-> -Int -Zero B : (-PS (-is-type 0 -NonPosFixnum) (-is-type 0 -PosFixnum)))
-       (-> -Zero -Int B : (-PS (-is-type 1 -NonNegFixnum) (-is-type 1 -NegFixnum)))
+       (-> ([x : -Int] [y : -One]) B : (-PS (-is-type x (Un -NonPosFixnum -One)) (-is-type x -PosFixnum)))
+       (-> ([x : -One] [y : -Int]) B : (-PS (-is-type y -PosFixnum) (-is-type y -NonPosFixnum)))
+       (-> ([x : -Int] [y : -Zero]) B : (-PS (-is-type x -NonPosFixnum) (-is-type x -PosFixnum)))
+       (-> ([x : -Zero] [y : -Int]) B : (-PS (-is-type y -NonNegFixnum) (-is-type y -NegFixnum)))
 
-       (-> -PosByte -Byte B : (-PS (-is-type 1 -PosByte) -tt))
-       (-> -Byte -Byte B : (-PS -tt (-is-type 0 -PosByte)))
-       (-> -Pos -Byte B : (-PS (-and (-is-type 0 -PosByte) (-is-type 1 -PosByte)) -tt))
-       (-> -Byte -Pos B : (-PS -tt (-and (-is-type 0 -PosByte) (-is-type 1 -PosByte))))
-       (-> -Byte -Nat B : (-PS -tt (-and (-is-type 0 -PosByte) (-is-type 1 -Byte))))
-       (-> -PosIndex -Index B : (-PS (-is-type 1 -PosIndex) -tt))
-       (-> -Index -Index B : (-PS -tt (-is-type 0 -PosIndex)))
-       (-> -Pos -Index B : (-PS (-and (-is-type 0 -PosIndex) (-is-type 1 -PosIndex)) -tt))
-       (-> -Index -Pos B : (-PS -tt (-and (-is-type 0 -PosIndex) (-is-type 1 -PosIndex))))
-       (-> -Nat -Byte B : (-PS (-is-type 0 -Byte) -tt))
-       (-> -Nat -Index B : (-PS (-is-type 0 -Index) -tt))
-       (-> -Index -Nat B : (-PS -tt (-and (-is-type 0 -PosIndex) (-is-type 1 -Index))))
+       (-> ([x : -PosByte] [y : -Byte]) B : (-PS (-is-type y -PosByte) -tt))
+       (-> ([x : -Byte] [y : -Byte]) B : (-PS -tt (-is-type x -PosByte)))
+       (-> ([x : -Pos] [y : -Byte]) B : (-PS (-and (-is-type x -PosByte) (-is-type y -PosByte)) -tt))
+       (-> ([x : -Byte] [y : -Pos]) B : (-PS -tt (-and (-is-type x -PosByte) (-is-type y -PosByte))))
+       (-> ([x : -Byte] [y : -Nat]) B : (-PS -tt (-and (-is-type x -PosByte) (-is-type y -Byte))))
+       (-> ([x : -PosIndex] [y : -Index]) B : (-PS (-is-type y -PosIndex) -tt))
+       (-> ([x : -Index] [y : -Index]) B : (-PS -tt (-is-type x -PosIndex)))
+       (-> ([x : -Pos] [y : -Index]) B : (-PS (-and (-is-type x -PosIndex) (-is-type y -PosIndex)) -tt))
+       (-> ([x : -Index] [y : -Pos]) B : (-PS -tt (-and (-is-type x -PosIndex) (-is-type y -PosIndex))))
+       (-> ([x : -Nat] [y : -Byte]) B : (-PS (-is-type x -Byte) -tt))
+       (-> ([x : -Nat] [y : -Index]) B : (-PS (-is-type x -Index) -tt))
+       (-> ([x : -Index] [y : -Nat]) B : (-PS -tt (-and (-is-type x -PosIndex) (-is-type y -Index))))
        ;; general integer cases
-       (-> -PosInt -Int B : (-PS (-is-type 1 -PosFixnum) -tt))
-       (-> -Int -Nat B : (-PS -tt (-is-type 0 -PosFixnum)))
-       (-> -Nat -Int B : (-PS (-is-type 1 -NonNegFixnum) -tt))
-       (-> -Int -NegInt B : (-PS (-is-type 0 -NegFixnum) -tt))
-       (-> -Int -NonPosInt B : (-PS (-is-type 0 -NonPosFixnum) -tt))
-       (-> -NonPosInt -Int B : (-PS -tt (-is-type 1 -NegFixnum)))
+       (-> ([x : -PosInt] [y : -Int]) B : (-PS (-is-type y -PosFixnum) -tt))
+       (-> ([x : -Int] [y : -Nat]) B : (-PS -tt (-is-type x -PosFixnum)))
+       (-> ([x : -Nat] [y : -Int]) B : (-PS (-is-type y -NonNegFixnum) -tt))
+       (-> ([x : -Int] [y : -NegInt]) B : (-PS (-is-type x -NegFixnum) -tt))
+       (-> ([x : -Int] [y : -NonPosInt]) B : (-PS (-is-type x -NonPosFixnum) -tt))
+       (-> ([x : -NonPosInt] [y : -Int]) B : (-PS -tt (-is-type y -NegFixnum)))
        (comp -Int))))
   (define fx>=-type
     (lambda ()
       (fx-from-cases
-       (-> -One -Int B : (-PS (-is-type 1 (Un -One -NonPosInt)) (-is-type 1 -PosFixnum)))
-       (-> -Int -One B : (-PS (-is-type 0 -PosFixnum) (-is-type 0 -NonPosFixnum)))
-       (-> -Zero -Int B : (-PS (-is-type 1 -NonPosFixnum) (-is-type 1 -PosFixnum)))
-       (-> -Int -Zero B : (-PS (-is-type 0 -NonNegFixnum) (-is-type 0 -NegFixnum)))
+       (-> ([x : -One] [y : -Int]) B : (-PS (-is-type y (Un -One -NonPosInt)) (-is-type y -PosFixnum)))
+       (-> ([x : -Int] [y : -One]) B : (-PS (-is-type x -PosFixnum) (-is-type x -NonPosFixnum)))
+       (-> ([x : -Zero] [y : -Int]) B : (-PS (-is-type y -NonPosFixnum) (-is-type y -PosFixnum)))
+       (-> ([x : -Int] [y : -Zero]) B : (-PS (-is-type x -NonNegFixnum) (-is-type x -NegFixnum)))
 
-       (-> -Byte -PosByte B : (-PS (-is-type 0 -PosByte) -tt))
-       (-> -Byte -Byte B : (-PS -tt (-is-type 1 -PosByte)))
-       (-> -Byte -Pos B : (-PS (-and (-is-type 1 -PosByte) (-is-type 0 -PosByte)) -tt))
-       (-> -Pos -Byte B : (-PS -tt (-and (-is-type 1 -PosByte) (-is-type 0 -PosByte))))
-       (-> -Byte -Nat B : (-PS (-is-type 1 -Byte) -tt))
-       (-> -Zero -Index B : (-PS (-is-type 1 -Zero) (-is-type 1 -PosIndex)))
-       (-> -Index -PosIndex B : (-PS (-is-type 0 -PosIndex) -tt))
-       (-> -Index -Index B : (-PS -tt (-is-type 1 -PosIndex)))
-       (-> -Index -Pos B : (-PS (-and (-is-type 0 -PosIndex) (-is-type 1 -PosIndex)) -tt))
-       (-> -Pos -Index B : (-PS -tt (-and (-is-type 0 -PosIndex) (-is-type 1 -PosIndex))))
-       (-> -Index -Nat B : (-PS (-is-type 1 -Index) -tt))
-       (-> -Nat -Byte B : (-PS -tt (-and (-is-type 0 -Byte) (-is-type 1 -PosByte))))
-       (-> -Nat -Index B : (-PS -tt (-and (-is-type 0 -Index) (-is-type 1 -PosIndex))))
+       (-> ([x : -Byte] [y : -PosByte]) B : (-PS (-is-type x -PosByte) -tt))
+       (-> ([x : -Byte] [y : -Byte]) B : (-PS -tt (-is-type y -PosByte)))
+       (-> ([x : -Byte] [y : -Pos]) B : (-PS (-and (-is-type y -PosByte) (-is-type x -PosByte)) -tt))
+       (-> ([x : -Pos] [y : -Byte]) B : (-PS -tt (-and (-is-type y -PosByte) (-is-type x -PosByte))))
+       (-> ([x : -Byte] [y : -Nat]) B : (-PS (-is-type y -Byte) -tt))
+       (-> ([x : -Zero] [y : -Index]) B : (-PS (-is-type y -Zero) (-is-type y -PosIndex)))
+       (-> ([x : -Index] [y : -PosIndex]) B : (-PS (-is-type x -PosIndex) -tt))
+       (-> ([x : -Index] [y : -Index]) B : (-PS -tt (-is-type y -PosIndex)))
+       (-> ([x : -Index] [y : -Pos]) B : (-PS (-and (-is-type x -PosIndex) (-is-type y -PosIndex)) -tt))
+       (-> ([x : -Pos] [y : -Index]) B : (-PS -tt (-and (-is-type x -PosIndex) (-is-type y -PosIndex))))
+       (-> ([x : -Index] [y : -Nat]) B : (-PS (-is-type y -Index) -tt))
+       (-> ([x : -Nat] [y : -Byte]) B : (-PS -tt (-and (-is-type x -Byte) (-is-type y -PosByte))))
+       (-> ([x : -Nat] [y : -Index]) B : (-PS -tt (-and (-is-type x -Index) (-is-type y -PosIndex))))
        ;; general integer cases
-       (-> -Int -PosInt B : (-PS (-is-type 0 -PosFixnum) -tt))
-       (-> -Nat -Int B : (-PS -tt (-is-type 1 -PosFixnum)))
-       (-> -Int -Nat B : (-PS (-is-type 0 -NonNegFixnum) -tt))
-       (-> -NegInt -Int B : (-PS (-is-type 1 -NegFixnum) -tt))
-       (-> -NonPosInt -Int B : (-PS (-is-type 1 -NonPosFixnum) -tt))
-       (-> -Int -NonPosInt B : (-PS -tt (-is-type 0 -NegFixnum)))
+       (-> ([x : -Int] [y : -PosInt]) B : (-PS (-is-type x -PosFixnum) -tt))
+       (-> ([x : -Nat] [y : -Int]) B : (-PS -tt (-is-type y -PosFixnum)))
+       (-> ([x : -Int] [y : -Nat]) B : (-PS (-is-type x -NonNegFixnum) -tt))
+       (-> ([x : -NegInt] [y : -Int]) B : (-PS (-is-type y -NegFixnum) -tt))
+       (-> ([x : -NonPosInt] [y : -Int]) B : (-PS (-is-type y -NonPosFixnum) -tt))
+       (-> ([x : -Int] [y : -NonPosInt]) B : (-PS -tt (-is-type x -NegFixnum)))
        (comp -Int))))
   (define fxmin-type
     (lambda ()
       (fx-from-cases
-       (-> -Nat -NonPosInt -NonPosFixnum : -true-propset : (-arg-path 1))
-       (-> -NonPosInt -Nat -NonPosFixnum : -true-propset : (-arg-path 0))
+       (-> ([x : -Nat] [y : -NonPosInt]) -NonPosFixnum : -true-propset : (-id-path y))
+       (-> ([x : -NonPosInt] [y : -Nat]) -NonPosFixnum : -true-propset : (-id-path x))
        (-> -Zero -Int -NonPosFixnum)
        (-> -Int -Zero -NonPosFixnum)
 
@@ -335,8 +337,8 @@
   (define fxmax-type
     (lambda ()
       (fx-from-cases
-       (-> -NonPosInt -Nat -NonNegFixnum : -true-propset : (-arg-path 1))
-       (-> -Nat -NonPosInt -NonNegFixnum : -true-propset : (-arg-path 0))
+       (-> ([x : -NonPosInt] [y : -Nat]) -NonNegFixnum : -true-propset : (-id-path y))
+       (-> ([x : -Nat] [y : -NonPosInt]) -NonNegFixnum : -true-propset : (-id-path x))
        (-> -Zero -Int -NonNegFixnum)
        (-> -Int -Zero -NonNegFixnum)
 
@@ -360,8 +362,8 @@
   (define fxior-type
     (lambda ()
       (fx-from-cases
-       (-> -Zero -Int -Fixnum : -true-propset : (-arg-path 1))
-       (-> -Int -Zero -Fixnum : -true-propset : (-arg-path 0))
+       (-> ([x : -Zero] [y : -Int]) -Fixnum : -true-propset : (-id-path y))
+       (-> ([x : -Int] [y : -Zero]) -Fixnum : -true-propset : (-id-path x))
 
        (commutative-binop -PosByte -Byte -PosByte)
        (binop -Byte)
@@ -374,8 +376,8 @@
   (define fxxor-type
     (lambda ()
       (fx-from-cases
-       (-> -Zero -Int -Fixnum : -true-propset : (-arg-path 1))
-       (-> -Int -Zero -Fixnum : -true-propset : (-arg-path 0))
+       (-> ([x : -Zero] [y : -Int]) -Fixnum : -true-propset : (-id-path y))
+       (-> ([x : -Int] [y : -Zero]) -Fixnum : -true-propset : (-id-path x))
 
        (binop -One -Zero)
        (binop -Byte)
@@ -394,7 +396,7 @@
   (define fxlshift-type
     (lambda ()
       (fx-from-cases
-       (-> -Int -Zero -Fixnum : -true-propset : (-arg-path 0))
+       (-> ([x : -Int] [y : -Zero]) -Fixnum : -true-propset : (-id-path x))
        (-> -PosInt -Int -PosFixnum) ; negative 2nd arg errors, so we can't reach 0
        (-> -Nat -Int -NonNegFixnum)
        (-> -NegInt -Int -NegFixnum)
@@ -403,7 +405,7 @@
   (define fxrshift-type
     (lambda ()
       (fx-from-cases
-       (-> -Int -Zero -Fixnum : -true-propset : (-arg-path 0))
+       (-> ([x : -Int] [y : -Zero]) -Fixnum : -true-propset : (-id-path x))
        (-> -Nat -Int -NonNegFixnum) ; can reach 0
        (-> -NegInt -Int -NegFixnum) ; can't reach 0
        (-> -NonPosInt -Int -NonPosFixnum)
@@ -504,30 +506,30 @@
     (fl-type-lambda
       (from-cases
        ;; false case, we know nothing, lhs may be NaN. same for all comparison that can involve floats
-       (-> -NonNegFl -Fl B : (-PS (-is-type 1 -PosFl) -tt))
-       (-> -Fl -NonPosFl B : (-PS (-is-type 0 -NegFl) -tt))
+       (-> ([x : -NonNegFl] [y : -Fl]) B : (-PS (-is-type y -PosFl) -tt))
+       (-> ([x : -Fl] [y : -NonPosFl]) B : (-PS (-is-type x -NegFl) -tt))
        (comp -Fl))))
   (define fl>-type
     (fl-type-lambda
       (from-cases
-       (-> -NonPosFl -Fl B : (-PS (-is-type 1 -NegFl) -tt))
-       (-> -Fl -NonNegFl B : (-PS (-is-type 0 -PosFl) -tt))
+       (-> ([x : -NonPosFl] [y : -Fl]) B : (-PS (-is-type y -NegFl) -tt))
+       (-> ([x : -Fl] [y : -NonNegFl]) B : (-PS (-is-type x -PosFl) -tt))
        (comp -Fl))))
   (define fl<=-type
     (fl-type-lambda
       (from-cases
-       (-> -PosFl -Fl B : (-PS (-is-type 1 -PosFl) -tt))
-       (-> -NonNegFl -Fl B : (-PS (-is-type 1 -NonNegFl) -tt))
-       (-> -Fl -NegFl B : (-PS (-is-type 0 -NegFl) -tt))
-       (-> -Fl -NonPosFl B : (-PS (-is-type 0 -NonPosFl) -tt))
+       (-> ([x : -PosFl] [y : -Fl]) B : (-PS (-is-type y -PosFl) -tt))
+       (-> ([x : -NonNegFl] [y : -Fl]) B : (-PS (-is-type y -NonNegFl) -tt))
+       (-> ([x : -Fl] [y : -NegFl]) B : (-PS (-is-type x -NegFl) -tt))
+       (-> ([x : -Fl] [y : -NonPosFl]) B : (-PS (-is-type x -NonPosFl) -tt))
        (comp -Fl))))
   (define fl>=-type
     (fl-type-lambda
       (from-cases
-       (-> -Fl -PosFl B : (-PS (-is-type 0 -PosFl) -tt))
-       (-> -Fl -NonNegFl B : (-PS (-is-type 0 -NonNegFl) -tt))
-       (-> -NegFl -Fl B : (-PS (-is-type 1 -NegFl) -tt))
-       (-> -NonPosFl -Fl B : (-PS (-is-type 1 -NonPosFl) -tt))
+       (-> ([x : -Fl] [y : -PosFl]) B : (-PS (-is-type x -PosFl) -tt))
+       (-> ([x : -Fl] [y : -NonNegFl]) B : (-PS (-is-type x -NonNegFl) -tt))
+       (-> ([x : -NegFl] [y : -Fl]) B : (-PS (-is-type y -NegFl) -tt))
+       (-> ([x : -NonPosFl] [y : -Fl]) B : (-PS (-is-type y -NonPosFl) -tt))
        (comp -Fl))))
   (define flmin-type
     (fl-type-lambda
@@ -601,48 +603,48 @@
   (define (<-type-pattern base pos non-neg neg non-pos [zero -RealZero]
                           #:no-false-props? [no-false-props? #f])
     (define (-PS* t f) (-PS t (if no-false-props? -tt f)))
-    (list (-> base zero B : (-PS* (-is-type 0 neg) (-is-type 0 non-neg)))
-          (-> zero base B : (-PS* (-is-type 1 pos) (-is-type 1 non-pos)))
-          (-> base -PosReal B : (-PS* -tt (-is-type 0 pos)))
-          (-> base -NonNegReal B : (-PS* -tt (-is-type 0 non-neg)))
-          (-> -NonNegReal base B : (-PS* (-is-type 1 pos) -tt))
-          (-> base -NonPosReal B : (-PS* (-is-type 0 neg) -tt))
-          (-> -NegReal base B : (-PS* -tt (-is-type 1 neg)))
-          (-> -NonPosReal base B : (-PS* -tt (-is-type 1 non-pos)))))
+    (list (-> ([x : base] [y : zero]) B : (-PS* (-is-type x neg) (-is-type x non-neg)))
+          (-> ([x : zero] [y : base]) B : (-PS* (-is-type y pos) (-is-type y non-pos)))
+          (-> ([x : base] [y : -PosReal]) B : (-PS* -tt (-is-type x pos)))
+          (-> ([x : base] [y : -NonNegReal]) B : (-PS* -tt (-is-type x non-neg)))
+          (-> ([x : -NonNegReal] [y : base]) B : (-PS* (-is-type y pos) -tt))
+          (-> ([x : base] [y : -NonPosReal]) B : (-PS* (-is-type x neg) -tt))
+          (-> ([x : -NegReal] [y : base]) B : (-PS* -tt (-is-type y neg)))
+          (-> ([x : -NonPosReal] [y : base]) B : (-PS* -tt (-is-type y non-pos)))))
   (define (>-type-pattern base pos non-neg neg non-pos [zero -RealZero]
                           #:no-false-props? [no-false-props? #f])
     (define (-PS* t f) (-PS t (if no-false-props? -tt f)))
-    (list (-> base zero B : (-PS* (-is-type 0 pos) (-is-type 0 non-pos)))
-          (-> zero base B : (-PS* (-is-type 1 neg) (-is-type 1 non-neg)))
-          (-> base -NonNegReal B : (-PS* (-is-type 0 pos) -tt))
-          (-> -PosReal base B : (-PS* -tt (-is-type 1 pos)))
-          (-> -NonNegReal base B : (-PS* -tt (-is-type 1 non-neg)))
-          (-> -NonPosReal base B : (-PS* (-is-type 1 neg) -tt))
-          (-> base -NegReal B : (-PS* -tt (-is-type 0 neg)))
-          (-> base -NonPosReal B : (-PS* -tt (-is-type 0 non-pos)))))
+    (list (-> ([x : base] [y : zero]) B : (-PS* (-is-type x pos) (-is-type x non-pos)))
+          (-> ([x : zero] [y : base]) B : (-PS* (-is-type y neg) (-is-type y non-neg)))
+          (-> ([x : base] [y : -NonNegReal]) B : (-PS* (-is-type x pos) -tt))
+          (-> ([x : -PosReal] [y : base]) B : (-PS* -tt (-is-type y pos)))
+          (-> ([x : -NonNegReal] [y : base]) B : (-PS* -tt (-is-type y non-neg)))
+          (-> ([x : -NonPosReal] [y : base]) B : (-PS* (-is-type y neg) -tt))
+          (-> ([x : base] [y : -NegReal]) B : (-PS* -tt (-is-type x neg)))
+          (-> ([x : base] [y : -NonPosReal]) B : (-PS* -tt (-is-type x non-pos)))))
   ;; this is > with flipped props
   (define (<=-type-pattern base pos non-neg neg non-pos [zero -RealZero]
                            #:no-false-props? [no-false-props? #f])
     (define (-PS* t f) (-PS t (if no-false-props? -tt f)))
-    (list (-> base zero B : (-PS* (-is-type 0 non-pos) (-is-type 0 pos)))
-          (-> zero base B : (-PS* (-is-type 1 non-neg) (-is-type 1 neg)))
-          (-> base -NonNegReal B : (-PS* -tt (-is-type 0 pos)))
-          (-> -PosReal base B : (-PS* (-is-type 1 pos) -tt))
-          (-> -NonNegReal base B : (-PS* (-is-type 1 non-neg) -tt))
-          (-> -NonPosReal base B : (-PS* -tt (-is-type 1 neg)))
-          (-> base -NegReal B : (-PS* (-is-type 0 neg) -tt))
-          (-> base -NonPosReal B : (-PS* (-is-type 0 non-pos) -tt))))
+    (list (-> ([x : base] [y : zero]) B : (-PS* (-is-type x non-pos) (-is-type x pos)))
+          (-> ([x : zero] [y : base]) B : (-PS* (-is-type y non-neg) (-is-type y neg)))
+          (-> ([x : base] [y : -NonNegReal]) B : (-PS* -tt (-is-type x pos)))
+          (-> ([x : -PosReal] [y : base]) B : (-PS* (-is-type y pos) -tt))
+          (-> ([x : -NonNegReal] [y : base]) B : (-PS* (-is-type y non-neg) -tt))
+          (-> ([x : -NonPosReal] [y : base]) B : (-PS* -tt (-is-type y neg)))
+          (-> ([x : base] [y : -NegReal]) B : (-PS* (-is-type x neg) -tt))
+          (-> ([x : base] [y : -NonPosReal]) B : (-PS* (-is-type x non-pos) -tt))))
   (define (>=-type-pattern base pos non-neg neg non-pos [zero -RealZero]
                            #:no-false-props? [no-false-props? #f])
     (define (-PS* t f) (-PS t (if no-false-props? -tt f)))
-    (list (-> base zero B : (-PS* (-is-type 0 non-neg) (-is-type 0 neg)))
-          (-> zero base B : (-PS* (-is-type 1 non-pos) (-is-type 1 pos)))
-          (-> base -PosReal B : (-PS* (-is-type 0 pos) -tt))
-          (-> base -NonNegReal B : (-PS* (-is-type 0 non-neg) -tt))
-          (-> -NonNegReal base B : (-PS* -tt (-is-type 1 pos)))
-          (-> base -NonPosReal B : (-PS* -tt (-is-type 0 neg)))
-          (-> -NegReal base B : (-PS* (-is-type 1 neg) -tt))
-          (-> -NonPosReal base B : (-PS* (-is-type 1 non-pos) -tt))))
+    (list (-> ([x : base] [y : zero]) B : (-PS* (-is-type x non-neg) (-is-type x neg)))
+          (-> ([x : zero] [y : base]) B : (-PS* (-is-type y non-pos) (-is-type y pos)))
+          (-> ([x : base] [y : -PosReal]) B : (-PS* (-is-type x pos) -tt))
+          (-> ([x : base] [y : -NonNegReal]) B : (-PS* (-is-type x non-neg) -tt))
+          (-> ([x : -NonNegReal] [y : base]) B : (-PS* -tt (-is-type y pos)))
+          (-> ([x : base] [y : -NonPosReal]) B : (-PS* -tt (-is-type x neg)))
+          (-> ([x : -NegReal] [y : base]) B : (-PS* (-is-type y neg) -tt))
+          (-> ([x : -NonPosReal] [y : base]) B : (-PS* (-is-type y non-pos) -tt))))
 
   (define (negation-pattern pos neg non-neg non-pos)
     (list (-> pos neg)
@@ -664,7 +666,7 @@
   (define abs-cases ; used both for abs and magnitude
     (list
      ;; abs is not the identity on negative zeros.
-     ((Un -Zero -PosReal) . -> . (Un -Zero -PosReal) : -true-propset : (-arg-path 0))
+     (-> ([x : (Un -Zero -PosReal)]) (Un -Zero -PosReal) : -true-propset : (-id-path x))
      ;; but we know that we at least get *some* zero, and that it preserves exactness
      (map unop (list -FlonumZero -SingleFlonumZero -RealZero))
      ;; abs may not be closed on fixnums. (abs min-fixnum) is not a fixnum
@@ -723,37 +725,37 @@
 ;; There are 25 values that answer true to zero?. They are either reals, or inexact complexes.
 ;; Note -RealZero contains NaN and zero? returns #f on it
 [zero?
-  (-> N B : (-PS (-is-type 0 (Un -RealZeroNoNan -InexactComplex -InexactImaginary))
-                 (-not-type 0 -RealZeroNoNan)))]
+  (-> ([x : N]) B : (-PS (-is-type x (Un -RealZeroNoNan -InexactComplex -InexactImaginary))
+                         (-not-type x -RealZeroNoNan)))]
 
-[number? (make-pred-ty N)]
-[integer? (asym-pred Univ B (-PS (-is-type 0 (Un -Int -Flonum -SingleFlonum)) ; inexact-integers exist...
-                                 (-not-type 0 -Int)))]
-[exact-integer? (make-pred-ty -Int)]
-[real? (make-pred-ty -Real)]
-[flonum? (make-pred-ty -Flonum)]
-[single-flonum? (make-pred-ty -SingleFlonum)]
-[double-flonum? (make-pred-ty -Flonum)]
-[inexact-real? (make-pred-ty -InexactReal)]
-[complex? (make-pred-ty N)]
+[number? (pred-> N)]
+[integer? (-> ([x : Univ]) B : (-PS (-is-type x (Un -Int -Flonum -SingleFlonum)) ; inexact-integers exist...
+                                    (-not-type x -Int)))]
+[exact-integer? (pred-> -Int)]
+[real? (pred-> -Real)]
+[flonum? (pred-> -Flonum)]
+[single-flonum? (pred-> -SingleFlonum)]
+[double-flonum? (pred-> -Flonum)]
+[inexact-real? (pred-> -InexactReal)]
+[complex? (pred-> N)]
 ;; `rational?' includes all Reals, except infinities and NaN.
-[rational? (asym-pred Univ B (-PS (-is-type 0 -Real) (-not-type 0 -Rat)))]
-[exact? (make-pred-ty -ExactNumber)]
-[inexact? (make-pred-ty (Un -InexactReal -InexactImaginary -InexactComplex))]
-[fixnum? (make-pred-ty -Fixnum)]
-[index? (make-pred-ty -Index)]
-[positive? (-> -Real B : (-PS (-is-type 0 -PosReal) (-is-type 0 -NonPosReal)))]
-[negative? (-> -Real B : (-PS (-is-type 0 -NegReal) (-is-type 0 -NonNegReal)))]
-[exact-positive-integer? (make-pred-ty -Pos)]
-[exact-nonnegative-integer? (make-pred-ty -Nat)]
+[rational? (-> ([x : Univ]) B : (-PS (-is-type x -Real) (-not-type x -Rat)))]
+[exact? (pred-> -ExactNumber)]
+[inexact? (pred-> (Un -InexactReal -InexactImaginary -InexactComplex))]
+[fixnum? (pred-> -Fixnum)]
+[index? (pred-> -Index)]
+[positive? (-> ([x : -Real]) B : (-PS (-is-type x -PosReal) (-is-type x -NonPosReal)))]
+[negative? (-> ([x : -Real]) B : (-PS (-is-type x -NegReal) (-is-type x -NonNegReal)))]
+[exact-positive-integer? (pred-> -Pos)]
+[exact-nonnegative-integer? (pred-> -Nat)]
 
-[odd? (-> -Int B : (-PS (-not-type 0 -Zero) (-not-type 0 -One)))]
-[even? (-> -Int B : (-PS (-not-type 0 -One) (-not-type 0 -Zero)))]
+[odd? (-> ([x : -Int]) B : (-PS (-not-type x -Zero) (-not-type x -One)))]
+[even? (-> ([x : -Int]) B : (-PS (-not-type x -One) (-not-type x -Zero)))]
 
 [=
  (from-cases
-   (-> -Real -RealZero B : (-PS (-is-type 0 -RealZeroNoNan) (-not-type 0 -RealZeroNoNan)))
-   (-> -RealZero -Real B : (-PS (-is-type 1 -RealZeroNoNan) (-not-type 1 -RealZeroNoNan)))
+   (-> ([x : -Real] [y : -RealZero]) B : (-PS (-is-type x -RealZeroNoNan) (-not-type x -RealZeroNoNan)))
+   (-> ([x : -RealZero] [y : -Real]) B : (-PS (-is-type y -RealZeroNoNan) (-not-type y -RealZeroNoNan)))
   (map (lambda (t) (commutative-equality/prop -ExactNumber t))
        (list -One -PosByte -Byte -PosIndex -Index
              -PosFixnum -NonNegFixnum -NegFixnum -NonPosFixnum -Fixnum
@@ -767,47 +769,47 @@
   (->* (list N N) N B))]
 
 [<  (from-cases
-     (-> -Int -One B : (-PS (-is-type 0 -NonPosInt) (-is-type 0 -PosInt)))
-     (-> -Real -Zero B : (-PS (-is-type 0 -NegReal) (-is-type 0 -NonNegReal)))
-     (-> -Zero -Real B : (-PS (-is-type 1 -PosReal) (-is-type 1 -NonPosReal)))
-     (-> -Real -RealZero B : (-PS (-is-type 0 -NegReal) -tt)) ;; False says nothing because of NaN
-     (-> -RealZero -Real B : (-PS (-is-type 1 -PosReal) -tt)) ;; False says nothing because of NaN
-     (-> -Byte -PosByte B : (-PS -tt (-is-type 0 -PosByte)))
-     (-> -Byte -Byte B : (-PS (-is-type 1 -PosByte) -tt))
-     (-> -PosInt -Byte B : (-PS (-and (-is-type 0 -PosByte) (-is-type 1 -PosByte)) -tt))
-     (-> -PosReal -Byte B : (-PS (-is-type 1 -PosByte) -tt)) ; -PosReal is ok here, no prop for #f
-     (-> -Byte -PosInt B : (-PS -tt (-and (-is-type 0 -PosByte) (-is-type 1 -PosByte))))
-     (-> -Byte -PosRat B : (-PS -tt (-is-type 0 -PosByte))) ; can't be -PosReal, which includes NaN
-     (-> -Nat -Byte B : (-PS (-and (-is-type 0 -Byte) (-is-type 1 -PosByte)) -tt))
-     (-> -NonNegReal -Byte B : (-PS (-is-type 1 -PosByte) -tt))
-     (-> -Byte -Nat B : (-PS -tt (-is-type 1 -Byte)))
-     (-> -Index -PosIndex B : (-PS -tt (-is-type 0 -PosIndex)))
-     (-> -Index -Index B : (-PS (-is-type 1 -PosIndex) -tt))
-     (-> -PosInt -Index B : (-PS (-and (-is-type 0 -PosIndex) (-is-type 1 -PosIndex)) -tt))
-     (-> -PosReal -Index B : (-PS (-is-type 1 -PosIndex) -tt))
-     (-> -Index -PosInt B : (-PS -tt (-and (-is-type 0 -PosIndex) (-is-type 1 -PosIndex))))
-     (-> -Index -PosRat B : (-PS -tt (-is-type 0 -PosIndex))) ; can't be -PosReal, which includes NaN
-     (-> -Nat -Index B : (-PS (-and (-is-type 0 -Index) (-is-type 1 -PosIndex)) -tt))
-     (-> -NonNegReal -Index B : (-PS (-is-type 1 -PosIndex) -tt))
-     (-> -Index -Nat B : (-PS -tt (-is-type 1 -Index)))
-     (-> -Fixnum -PosInt B : (-PS -tt (-and (-is-type 0 -PosFixnum) (-is-type 1 -PosFixnum))))
-     (-> -Fixnum -PosRat B : (-PS -tt (-is-type 0 -PosFixnum)))
-     (-> -Fixnum -Nat B : (-PS -tt (-and (-is-type 0 -NonNegFixnum) (-is-type 1 -NonNegFixnum))))
-     (-> -Fixnum -NonNegRat B : (-PS -tt (-is-type 0 -NonNegFixnum)))
-     (-> -Nat -Fixnum B : (-PS (-and (-is-type 1 -PosFixnum) (-is-type 0 -NonNegFixnum)) -tt))
-     (-> -NonNegReal -Fixnum B : (-PS (-is-type 1 -PosFixnum) -tt))
-     (-> -Fixnum -NonPosInt B : (-PS (-and (-is-type 0 -NegFixnum) (-is-type 1 -NonPosFixnum)) -tt))
-     (-> -Fixnum -NonPosReal B : (-PS (-is-type 0 -NegFixnum) -tt))
-     (-> -NegInt -Fixnum B : (-PS -tt (-and (-is-type 0 -NegFixnum) (-is-type 1 -NegFixnum))))
-     (-> -NegRat -Fixnum B : (-PS -tt (-is-type 1 -NegFixnum)))
-     (-> -NonPosInt -Fixnum B : (-PS -tt (-and (-is-type 0 -NonPosFixnum) (-is-type 1 -NonPosFixnum))))
-     (-> -NonPosRat -Fixnum B : (-PS -tt (-is-type 1 -NonPosFixnum)))
-     (-> -Real -PosInfinity B : (-PS (-not-type 0 (Un -InexactRealNan -PosInfinity))
-                                     (-is-type 0 (Un -InexactRealNan -PosInfinity))))
-     (-> -NegInfinity -Real B : (-PS (-not-type 1 (Un -InexactRealNan -NegInfinity))
-                                     (-is-type 1 (Un -InexactRealNan -NegInfinity))))
-     (-> -PosInfinity -Real B : -false-propset)
-     (-> -Real -NegInfinity B : -false-propset)
+     (-> ([x : -Int] [y : -One]) B : (-PS (-is-type x -NonPosInt) (-is-type x -PosInt)))
+     (-> ([x : -Real] [y : -Zero]) B : (-PS (-is-type x -NegReal) (-is-type x -NonNegReal)))
+     (-> ([x : -Zero] [y : -Real]) B : (-PS (-is-type y -PosReal) (-is-type y -NonPosReal)))
+     (-> ([x : -Real] [y : -RealZero]) B : (-PS (-is-type x -NegReal) -tt)) ;; False says nothing because of NaN
+     (-> ([x : -RealZero] [y : -Real]) B : (-PS (-is-type y -PosReal) -tt)) ;; False says nothing because of NaN
+     (-> ([x : -Byte] [y : -PosByte]) B : (-PS -tt (-is-type x -PosByte)))
+     (-> ([x : -Byte] [y : -Byte]) B : (-PS (-is-type y -PosByte) -tt))
+     (-> ([x : -PosInt] [y : -Byte]) B : (-PS (-and (-is-type x -PosByte) (-is-type y -PosByte)) -tt))
+     (-> ([x : -PosReal] [y : -Byte]) B : (-PS (-is-type y -PosByte) -tt)) ; -PosReal is ok here, no prop for #f
+     (-> ([x : -Byte] [y : -PosInt]) B : (-PS -tt (-and (-is-type x -PosByte) (-is-type y -PosByte))))
+     (-> ([x : -Byte] [y : -PosRat]) B : (-PS -tt (-is-type x -PosByte))) ; can't be -PosReal, which includes NaN
+     (-> ([x : -Nat] [y : -Byte]) B : (-PS (-and (-is-type x -Byte) (-is-type y -PosByte)) -tt))
+     (-> ([x : -NonNegReal] [y : -Byte]) B : (-PS (-is-type y -PosByte) -tt))
+     (-> ([x : -Byte] [y : -Nat]) B : (-PS -tt (-is-type y -Byte)))
+     (-> ([x : -Index] [y : -PosIndex]) B : (-PS -tt (-is-type x -PosIndex)))
+     (-> ([x : -Index] [y : -Index]) B : (-PS (-is-type y -PosIndex) -tt))
+     (-> ([x : -PosInt] [y : -Index]) B : (-PS (-and (-is-type x -PosIndex) (-is-type y -PosIndex)) -tt))
+     (-> ([x : -PosReal] [y : -Index]) B : (-PS (-is-type y -PosIndex) -tt))
+     (-> ([x : -Index] [y : -PosInt]) B : (-PS -tt (-and (-is-type x -PosIndex) (-is-type y -PosIndex))))
+     (-> ([x : -Index] [y : -PosRat]) B : (-PS -tt (-is-type x -PosIndex))) ; can't be -PosReal, which includes NaN
+     (-> ([x : -Nat] [y : -Index]) B : (-PS (-and (-is-type x -Index) (-is-type y -PosIndex)) -tt))
+     (-> ([x : -NonNegReal] [y : -Index]) B : (-PS (-is-type y -PosIndex) -tt))
+     (-> ([x : -Index] [y : -Nat]) B : (-PS -tt (-is-type y -Index)))
+     (-> ([x : -Fixnum] [y : -PosInt]) B : (-PS -tt (-and (-is-type x -PosFixnum) (-is-type y -PosFixnum))))
+     (-> ([x : -Fixnum] [y : -PosRat]) B : (-PS -tt (-is-type x -PosFixnum)))
+     (-> ([x : -Fixnum] [y : -Nat]) B : (-PS -tt (-and (-is-type x -NonNegFixnum) (-is-type y -NonNegFixnum))))
+     (-> ([x : -Fixnum] [y : -NonNegRat]) B : (-PS -tt (-is-type x -NonNegFixnum)))
+     (-> ([x : -Nat] [y : -Fixnum]) B : (-PS (-and (-is-type y -PosFixnum) (-is-type x -NonNegFixnum)) -tt))
+     (-> ([x : -NonNegReal] [y : -Fixnum]) B : (-PS (-is-type y -PosFixnum) -tt))
+     (-> ([x : -Fixnum] [y : -NonPosInt]) B : (-PS (-and (-is-type x -NegFixnum) (-is-type y -NonPosFixnum)) -tt))
+     (-> ([x : -Fixnum] [y : -NonPosReal]) B : (-PS (-is-type x -NegFixnum) -tt))
+     (-> ([x : -NegInt] [y : -Fixnum]) B : (-PS -tt (-and (-is-type x -NegFixnum) (-is-type y -NegFixnum))))
+     (-> ([x : -NegRat] [y : -Fixnum]) B : (-PS -tt (-is-type y -NegFixnum)))
+     (-> ([x : -NonPosInt] [y : -Fixnum]) B : (-PS -tt (-and (-is-type x -NonPosFixnum) (-is-type y -NonPosFixnum))))
+     (-> ([x : -NonPosRat] [y : -Fixnum]) B : (-PS -tt (-is-type y -NonPosFixnum)))
+     (-> ([x : -Real] [y : -PosInfinity]) B : (-PS (-not-type x (Un -InexactRealNan -PosInfinity))
+                                                   (-is-type x (Un -InexactRealNan -PosInfinity))))
+     (-> ([x : -NegInfinity] [y : -Real]) B : (-PS (-not-type y (Un -InexactRealNan -NegInfinity))
+                                                   (-is-type y (Un -InexactRealNan -NegInfinity))))
+     (-> ([x : -PosInfinity] [y : -Real]) B : -false-propset)
+     (-> ([x : -Real] [y : -NegInfinity]) B : -false-propset)
      ;; If applying props resulted in the interesection of the prop and the
      ;; original type, we'd only need the cases for Fixnums and those for Reals.
      ;; Cases for Integers and co would fall out naturally from the Real cases,
@@ -822,47 +824,47 @@
      (<-type-pattern -Real -PosReal -NonNegReal -NegReal -NonPosReal #:no-false-props? #t)
      (->* (list R R) R B))]
 [>  (from-cases
-     (-> -One -Int B : (-PS (-is-type 1 -NonPosInt) (-is-type 1 -PosInt)))
-     (-> -Real -Zero B : (-PS (-is-type 0 -PosReal) (-is-type 0 -NonPosReal)))
-     (-> -Zero -Real B : (-PS (-is-type 1 -NegReal) (-is-type 1 -NonNegReal)))
-     (-> -Real -RealZero B : (-PS (-is-type 0 -PosReal) -tt)) ;; False says nothing because of NaN
-     (-> -RealZero -Real B : (-PS (-is-type 1 -NegReal) -tt)) ;; False says nothing because of NaN
-     (-> -PosByte -Byte B : (-PS -tt (-is-type 1 -PosByte)))
-     (-> -Byte -Byte B : (-PS (-is-type 0 -PosByte) -tt))
-     (-> -Byte -PosInt B : (-PS (-and (-is-type 0 -PosByte) (-is-type 1 -PosByte)) -tt))
-     (-> -Byte -PosReal B : (-PS (-is-type 0 -PosByte) -tt))
-     (-> -PosInt -Byte B : (-PS -tt (-and (-is-type 0 -PosByte) (-is-type 1 -PosByte))))
-     (-> -PosRat -Byte B : (-PS -tt (-is-type 1 -PosByte)))
-     (-> -Byte -Nat B : (-PS (-and (-is-type 0 -PosByte) (-is-type 1 -Byte)) -tt))
-     (-> -Byte -NonNegReal B : (-PS (-is-type 0 -PosByte) -tt))
-     (-> -Nat -Byte B : (-PS -tt (-is-type 0 -Byte)))
-     (-> -PosIndex -Index B : (-PS -tt (-is-type 1 -PosIndex)))
-     (-> -Index -Index B : (-PS (-is-type 0 -PosIndex) -tt))
-     (-> -Index -PosInt B : (-PS (-and (-is-type 0 -PosIndex) (-is-type 1 -PosIndex)) -tt))
-     (-> -Index -PosReal B : (-PS (-is-type 0 -PosIndex) -tt))
-     (-> -PosInt -Index B : (-PS -tt (-and (-is-type 0 -PosIndex) (-is-type 1 -PosIndex))))
-     (-> -PosRat -Index B : (-PS -tt (-is-type 1 -PosIndex)))
-     (-> -Index -Nat B : (-PS (-and (-is-type 0 -PosIndex) (-is-type 1 -Index)) -tt))
-     (-> -Index -NonNegReal B : (-PS (-is-type 0 -PosIndex) -tt))
-     (-> -Nat -Index B : (-PS -tt (-is-type 0 -Index)))
-     (-> -PosInt -Fixnum B : (-PS -tt (-and (-is-type 0 -PosFixnum) (-is-type 1 -PosFixnum))))
-     (-> -PosRat -Fixnum B : (-PS -tt (-is-type 1 -PosFixnum)))
-     (-> -Nat -Fixnum B : (-PS -tt (-and (-is-type 0 -NonNegFixnum) (-is-type 1 -NonNegFixnum))))
-     (-> -NonNegRat -Fixnum B : (-PS -tt (-is-type 1 -NonNegFixnum)))
-     (-> -Fixnum -Nat B : (-PS (-and (-is-type 0 -PosFixnum) (-is-type 1 -NonNegFixnum)) -tt))
-     (-> -Fixnum -NonNegReal B : (-PS (-is-type 0 -PosFixnum) -tt))
-     (-> -NonPosInt -Fixnum B : (-PS (-and (-is-type 0 -NonPosFixnum) (-is-type 1 -NegFixnum)) -tt))
-     (-> -NonPosReal -Fixnum B : (-PS (-is-type 1 -NegFixnum) -tt))
-     (-> -Fixnum -NegInt B : (-PS -tt (-and (-is-type 0 -NegFixnum) (-is-type 1 -NegFixnum))))
-     (-> -Fixnum -NegRat B : (-PS -tt (-is-type 0 -NegFixnum)))
-     (-> -Fixnum -NonPosInt B : (-PS -tt (-and (-is-type 0 -NonPosFixnum) (-is-type 1 -NonPosFixnum))))
-     (-> -Fixnum -NonPosRat B : (-PS -tt (-is-type 0 -NonPosFixnum)))
-     (-> -PosInfinity -Real B : (-PS (-not-type 1 (Un -InexactRealNan -PosInfinity))
-                                     (-is-type 1 (Un -InexactRealNan -PosInfinity))))
-     (-> -Real -NegInfinity B : (-PS (-not-type 0 (Un -InexactRealNan -NegInfinity))
-                                     (-is-type 0 (Un -InexactRealNan -NegInfinity))))
-     (-> -Real -PosInfinity B : -false-propset)
-     (-> -NegInfinity -Real B : -false-propset)
+     (-> ([x : -One] [y : -Int]) B : (-PS (-is-type y -NonPosInt) (-is-type y -PosInt)))
+     (-> ([x : -Real] [y : -Zero]) B : (-PS (-is-type x -PosReal) (-is-type x -NonPosReal)))
+     (-> ([x : -Zero] [y : -Real]) B : (-PS (-is-type y -NegReal) (-is-type y -NonNegReal)))
+     (-> ([x : -Real] [y : -RealZero]) B : (-PS (-is-type x -PosReal) -tt)) ;; False says nothing because of NaN
+     (-> ([x : -RealZero] [y : -Real]) B : (-PS (-is-type y -NegReal) -tt)) ;; False says nothing because of NaN
+     (-> ([x : -PosByte] [y : -Byte]) B : (-PS -tt (-is-type y -PosByte)))
+     (-> ([x : -Byte] [y : -Byte]) B : (-PS (-is-type x -PosByte) -tt))
+     (-> ([x : -Byte] [y : -PosInt]) B : (-PS (-and (-is-type x -PosByte) (-is-type y -PosByte)) -tt))
+     (-> ([x : -Byte] [y : -PosReal]) B : (-PS (-is-type x -PosByte) -tt))
+     (-> ([x : -PosInt] [y : -Byte]) B : (-PS -tt (-and (-is-type x -PosByte) (-is-type y -PosByte))))
+     (-> ([x : -PosRat] [y : -Byte]) B : (-PS -tt (-is-type y -PosByte)))
+     (-> ([x : -Byte] [y : -Nat]) B : (-PS (-and (-is-type x -PosByte) (-is-type y -Byte)) -tt))
+     (-> ([x : -Byte] [y : -NonNegReal]) B : (-PS (-is-type x -PosByte) -tt))
+     (-> ([x : -Nat] [y : -Byte]) B : (-PS -tt (-is-type x -Byte)))
+     (-> ([x : -PosIndex] [y : -Index]) B : (-PS -tt (-is-type y -PosIndex)))
+     (-> ([x : -Index] [y : -Index]) B : (-PS (-is-type x -PosIndex) -tt))
+     (-> ([x : -Index] [y : -PosInt]) B : (-PS (-and (-is-type x -PosIndex) (-is-type y -PosIndex)) -tt))
+     (-> ([x : -Index] [y : -PosReal]) B : (-PS (-is-type x -PosIndex) -tt))
+     (-> ([x : -PosInt] [y : -Index]) B : (-PS -tt (-and (-is-type x -PosIndex) (-is-type y -PosIndex))))
+     (-> ([x : -PosRat] [y : -Index]) B : (-PS -tt (-is-type y -PosIndex)))
+     (-> ([x : -Index] [y : -Nat]) B : (-PS (-and (-is-type x -PosIndex) (-is-type y -Index)) -tt))
+     (-> ([x : -Index] [y : -NonNegReal]) B : (-PS (-is-type x -PosIndex) -tt))
+     (-> ([x : -Nat] [y : -Index]) B : (-PS -tt (-is-type x -Index)))
+     (-> ([x : -PosInt] [y : -Fixnum]) B : (-PS -tt (-and (-is-type x -PosFixnum) (-is-type y -PosFixnum))))
+     (-> ([x : -PosRat] [y : -Fixnum]) B : (-PS -tt (-is-type y -PosFixnum)))
+     (-> ([x : -Nat] [y : -Fixnum]) B : (-PS -tt (-and (-is-type x -NonNegFixnum) (-is-type y -NonNegFixnum))))
+     (-> ([x : -NonNegRat] [y : -Fixnum]) B : (-PS -tt (-is-type y -NonNegFixnum)))
+     (-> ([x : -Fixnum] [y : -Nat]) B : (-PS (-and (-is-type x -PosFixnum) (-is-type y -NonNegFixnum)) -tt))
+     (-> ([x : -Fixnum] [y : -NonNegReal]) B : (-PS (-is-type x -PosFixnum) -tt))
+     (-> ([x : -NonPosInt] [y : -Fixnum]) B : (-PS (-and (-is-type x -NonPosFixnum) (-is-type y -NegFixnum)) -tt))
+     (-> ([x : -NonPosReal] [y : -Fixnum]) B : (-PS (-is-type y -NegFixnum) -tt))
+     (-> ([x : -Fixnum] [y : -NegInt]) B : (-PS -tt (-and (-is-type x -NegFixnum) (-is-type y -NegFixnum))))
+     (-> ([x : -Fixnum] [y : -NegRat]) B : (-PS -tt (-is-type x -NegFixnum)))
+     (-> ([x : -Fixnum] [y : -NonPosInt]) B : (-PS -tt (-and (-is-type x -NonPosFixnum) (-is-type y -NonPosFixnum))))
+     (-> ([x : -Fixnum] [y : -NonPosRat]) B : (-PS -tt (-is-type x -NonPosFixnum)))
+     (-> ([x : -PosInfinity] [y : -Real]) B : (-PS (-not-type y (Un -InexactRealNan -PosInfinity))
+                                                   (-is-type y (Un -InexactRealNan -PosInfinity))))
+     (-> ([x : -Real] [y : -NegInfinity]) B : (-PS (-not-type x (Un -InexactRealNan -NegInfinity))
+                                                   (-is-type x (Un -InexactRealNan -NegInfinity))))
+     (-> ([x : -Real] [y : -PosInfinity]) B : -false-propset)
+     (-> ([x : -NegInfinity] [y : -Real]) B : -false-propset)
      (>-type-pattern -Int -PosInt -Nat -NegInt -NonPosInt -Zero)
      (>-type-pattern -Rat -PosRat -NonNegRat -NegRat -NonPosRat -Zero)
      (>-type-pattern -Flonum -PosFlonum -NonNegFlonum -NegFlonum -NonPosFlonum #:no-false-props? #t)
@@ -871,46 +873,46 @@
      (>-type-pattern -Real -PosReal -NonNegReal -NegReal -NonPosReal #:no-false-props? #t)
      (->* (list R R) R B))]
 [<= (from-cases
-     (-> -Int -One B : (-PS (-is-type 0 (Un -NonPosInt -One)) (-is-type 0 -PosInt)))
-     (-> -One -Int B : (-PS (-is-type 1 -PosInt) (-is-type 1 -NonPosInt)))
-     (-> -Real -Zero B : (-PS (-is-type 0 -NonPosReal) (-is-type 0 -PosReal)))
-     (-> -Zero -Real B : (-PS (-is-type 1 -NonNegReal) (-is-type 1 -NegReal)))
-     (-> -Real -RealZero B : (-PS (-is-type 0 -NonPosReal) -tt)) ;; False says nothing because of NaN
-     (-> -RealZero -Real B : (-PS (-is-type 0 -NonNegReal) -tt)) ;; False says nothing because of NaN
-     (-> -PosByte -Byte B : (-PS (-is-type 1 -PosByte) -tt))
-     (-> -Byte -Byte B : (-PS -tt (-is-type 0 -PosByte)))
-     (-> -PosInt -Byte B : (-PS (-and (-is-type 0 -PosByte) (-is-type 1 -PosByte)) -tt))
-     (-> -PosReal -Byte B : (-PS (-is-type 1 -PosByte) -tt))
-     (-> -Byte -PosInt B : (-PS -tt (-and (-is-type 0 -PosByte) (-is-type 1 -PosByte))))
-     (-> -Byte -PosRat B : (-PS -tt (-is-type 0 -PosByte)))
-     (-> -Nat -Byte B : (-PS (-is-type 0 -Byte) -tt))
-     (-> -Byte -Nat B : (-PS -tt (-and (-is-type 0 -PosByte) (-is-type 1 -Byte))))
-     (-> -Byte -NonNegRat B : (-PS -tt (-is-type 0 -PosByte)))
-     (-> -PosIndex -Index B : (-PS (-is-type 1 -PosIndex) -tt))
-     (-> -Index -Index B : (-PS -tt (-is-type 0 -PosIndex)))
-     (-> -Pos -Index B : (-PS (-and (-is-type 0 -PosIndex) (-is-type 1 -PosIndex)) -tt))
-     (-> -PosReal -Index B : (-PS (-is-type 1 -PosIndex) -tt))
-     (-> -Index -Pos B : (-PS -tt (-and (-is-type 0 -PosIndex) (-is-type 1 -PosIndex))))
-     (-> -Index -PosRat B : (-PS -tt (-is-type 0 -PosIndex)))
-     (-> -Nat -Index B : (-PS (-is-type 0 -Index) -tt))
-     (-> -Index -Nat B : (-PS -tt (-and (-is-type 0 -PosIndex) (-is-type 1 -Index))))
-     (-> -Index -NonNegRat B : (-PS -tt (-is-type 0 -PosIndex)))
-     (-> -PosInt -Fixnum B : (-PS (-and (-is-type 0 -PosFixnum) (-is-type 1 -PosFixnum)) -tt))
-     (-> -PosReal -Fixnum B : (-PS (-is-type 1 -PosFixnum) -tt))
-     (-> -Nat -Fixnum B : (-PS (-and (-is-type 0 -NonNegFixnum) (-is-type 1 -NonNegFixnum)) -tt))
-     (-> -NonNegReal -Fixnum B : (-PS (-is-type 1 -NonNegFixnum) -tt))
-     (-> -Fixnum -Nat B : (-PS -tt (-and (-is-type 0 -PosFixnum) (-is-type 1 -NonNegFixnum))))
-     (-> -Fixnum -NonNegRat B : (-PS -tt (-is-type 0 -PosFixnum)))
-     (-> -NonPosInt -Fixnum B : (-PS -tt (-and (-is-type 0 -NonPosFixnum) (-is-type 1 -NegFixnum))))
-     (-> -NonPosRat -Fixnum B : (-PS -tt (-is-type 1 -NegFixnum)))
-     (-> -Fixnum -NegInt B : (-PS (-and (-is-type 0 -NegFixnum) (-is-type 1 -NegFixnum)) -tt))
-     (-> -Fixnum -NegReal B : (-PS (-is-type 0 -NegFixnum) -tt))
-     (-> -Fixnum -NonPosInt B : (-PS (-and (-is-type 0 -NonPosFixnum) (-is-type 1 -NonPosFixnum)) -tt))
-     (-> -Fixnum -NonPosReal B : (-PS (-is-type 0 -NonPosFixnum) -tt))
-     (-> -Real -PosInfinity B : (-PS (-not-type 0 -InexactRealNan) (-is-type 0 -InexactRealNan)))
-     (-> -NegInfinity -Real B : (-PS (-not-type 1 -InexactRealNan) (-is-type 1 -InexactRealNan)))
-     (-> -PosInfinity -Real B : (-PS (-is-type 1 -PosInfinity) (-not-type 1 -PosInfinity)))
-     (-> -Real -NegInfinity B : (-PS (-is-type 0 -NegInfinity) (-not-type 0 -NegInfinity)))
+     (-> ([x : -Int] [y : -One]) B : (-PS (-is-type x (Un -NonPosInt -One)) (-is-type x -PosInt)))
+     (-> ([x : -One] [y : -Int]) B : (-PS (-is-type y -PosInt) (-is-type y -NonPosInt)))
+     (-> ([x : -Real] [y : -Zero]) B : (-PS (-is-type x -NonPosReal) (-is-type x -PosReal)))
+     (-> ([x : -Zero] [y : -Real]) B : (-PS (-is-type y -NonNegReal) (-is-type y -NegReal)))
+     (-> ([x : -Real] [y : -RealZero]) B : (-PS (-is-type x -NonPosReal) -tt)) ;; False says nothing because of NaN
+     (-> ([x : -RealZero] [y : -Real]) B : (-PS (-is-type x -NonNegReal) -tt)) ;; False says nothing because of NaN
+     (-> ([x : -PosByte] [y : -Byte]) B : (-PS (-is-type y -PosByte) -tt))
+     (-> ([x : -Byte] [y : -Byte]) B : (-PS -tt (-is-type x -PosByte)))
+     (-> ([x : -PosInt] [y : -Byte]) B : (-PS (-and (-is-type x -PosByte) (-is-type y -PosByte)) -tt))
+     (-> ([x : -PosReal] [y : -Byte]) B : (-PS (-is-type y -PosByte) -tt))
+     (-> ([x : -Byte] [y : -PosInt]) B : (-PS -tt (-and (-is-type x -PosByte) (-is-type y -PosByte))))
+     (-> ([x : -Byte] [y : -PosRat]) B : (-PS -tt (-is-type x -PosByte)))
+     (-> ([x : -Nat] [y : -Byte]) B : (-PS (-is-type x -Byte) -tt))
+     (-> ([x : -Byte] [y : -Nat]) B : (-PS -tt (-and (-is-type x -PosByte) (-is-type y -Byte))))
+     (-> ([x : -Byte] [y : -NonNegRat]) B : (-PS -tt (-is-type x -PosByte)))
+     (-> ([x : -PosIndex] [y : -Index]) B : (-PS (-is-type y -PosIndex) -tt))
+     (-> ([x : -Index] [y : -Index]) B : (-PS -tt (-is-type x -PosIndex)))
+     (-> ([x : -Pos] [y : -Index]) B : (-PS (-and (-is-type x -PosIndex) (-is-type y -PosIndex)) -tt))
+     (-> ([x : -PosReal] [y : -Index]) B : (-PS (-is-type y -PosIndex) -tt))
+     (-> ([x : -Index] [y : -Pos]) B : (-PS -tt (-and (-is-type x -PosIndex) (-is-type y -PosIndex))))
+     (-> ([x : -Index] [y : -PosRat]) B : (-PS -tt (-is-type x -PosIndex)))
+     (-> ([x : -Nat] [y : -Index]) B : (-PS (-is-type x -Index) -tt))
+     (-> ([x : -Index] [y : -Nat]) B : (-PS -tt (-and (-is-type x -PosIndex) (-is-type y -Index))))
+     (-> ([x : -Index] [y : -NonNegRat]) B : (-PS -tt (-is-type x -PosIndex)))
+     (-> ([x : -PosInt] [y : -Fixnum]) B : (-PS (-and (-is-type x -PosFixnum) (-is-type y -PosFixnum)) -tt))
+     (-> ([x : -PosReal] [y : -Fixnum]) B : (-PS (-is-type y -PosFixnum) -tt))
+     (-> ([x : -Nat] [y : -Fixnum]) B : (-PS (-and (-is-type x -NonNegFixnum) (-is-type y -NonNegFixnum)) -tt))
+     (-> ([x : -NonNegReal] [y : -Fixnum]) B : (-PS (-is-type y -NonNegFixnum) -tt))
+     (-> ([x : -Fixnum] [y : -Nat]) B : (-PS -tt (-and (-is-type x -PosFixnum) (-is-type y -NonNegFixnum))))
+     (-> ([x : -Fixnum] [y : -NonNegRat]) B : (-PS -tt (-is-type x -PosFixnum)))
+     (-> ([x : -NonPosInt] [y : -Fixnum]) B : (-PS -tt (-and (-is-type x -NonPosFixnum) (-is-type y -NegFixnum))))
+     (-> ([x : -NonPosRat] [y : -Fixnum]) B : (-PS -tt (-is-type y -NegFixnum)))
+     (-> ([x : -Fixnum] [y : -NegInt]) B : (-PS (-and (-is-type x -NegFixnum) (-is-type y -NegFixnum)) -tt))
+     (-> ([x : -Fixnum] [y : -NegReal]) B : (-PS (-is-type x -NegFixnum) -tt))
+     (-> ([x : -Fixnum] [y : -NonPosInt]) B : (-PS (-and (-is-type x -NonPosFixnum) (-is-type y -NonPosFixnum)) -tt))
+     (-> ([x : -Fixnum] [y : -NonPosReal]) B : (-PS (-is-type x -NonPosFixnum) -tt))
+     (-> ([x : -Real] [y : -PosInfinity]) B : (-PS (-not-type x -InexactRealNan) (-is-type x -InexactRealNan)))
+     (-> ([x : -NegInfinity] [y : -Real]) B : (-PS (-not-type y -InexactRealNan) (-is-type y -InexactRealNan)))
+     (-> ([x : -PosInfinity] [y : -Real]) B : (-PS (-is-type y -PosInfinity) (-not-type y -PosInfinity)))
+     (-> ([x : -Real] [y : -NegInfinity]) B : (-PS (-is-type x -NegInfinity) (-not-type x -NegInfinity)))
      (<=-type-pattern -Int -PosInt -Nat -NegInt -NonPosInt -Zero)
      (<=-type-pattern -Rat -PosRat -NonNegRat -NegRat -NonPosRat -Zero)
      (<=-type-pattern -Flonum -PosFlonum -NonNegFlonum -NegFlonum -NonPosFlonum #:no-false-props? #t)
@@ -919,46 +921,46 @@
      (<=-type-pattern -Real -PosReal -NonNegReal -NegReal -NonPosReal #:no-false-props? #t)
      (->* (list R R) R B))]
 [>= (from-cases
-     (-> -One -Int B : (-PS (-is-type 1 (Un -One -NonPosInt)) (-is-type 1 -PosInt)))
-     (-> -Int -One B : (-PS (-is-type 0 -PosInt) (-is-type 0 -NonPosInt)))
-     (-> -Real -Zero B : (-PS (-is-type 0 -NonNegReal) (-is-type 0 -NegReal)))
-     (-> -Zero -Real B : (-PS (-is-type 1 -NonPosReal) (-is-type 1 -PosReal)))
-     (-> -Real -RealZero B : (-PS (-is-type 0 -NonNegReal) -tt)) ;; False says nothing because of NaN
-     (-> -RealZero -Real B : (-PS (-is-type 0 -NonPosReal) -tt)) ;; False says nothing because of NaN
-     (-> -Byte -PosByte B : (-PS (-is-type 0 -PosByte) -tt))
-     (-> -Byte -Byte B : (-PS -tt (-is-type 1 -PosByte)))
-     (-> -Byte -PosInt B : (-PS (-and (-is-type 0 -PosByte) (-is-type 1 -PosByte)) -tt))
-     (-> -Byte -PosReal B : (-PS (-is-type 0 -PosByte) -tt))
-     (-> -PosInt -Byte B : (-PS -tt (-and (-is-type 0 -PosByte) (-is-type 1 -PosByte))))
-     (-> -PosRat -Byte B : (-PS -tt (-is-type 1 -PosByte)))
-     (-> -Byte -Nat B : (-PS (-is-type 1 -Byte) -tt))
-     (-> -Nat -Byte B : (-PS -tt (-and (-is-type 0 -Byte) (-is-type 1 -PosByte))))
-     (-> -NonNegRat -Byte B : (-PS -tt (-is-type 1 -PosByte)))
-     (-> -Index -PosIndex B : (-PS (-is-type 0 -PosIndex) -tt))
-     (-> -Index -Index B : (-PS -tt (-is-type 1 -PosIndex)))
-     (-> -Index -Pos B : (-PS (-and (-is-type 0 -PosIndex) (-is-type 1 -PosIndex)) -tt))
-     (-> -Index -PosReal B : (-PS (-is-type 0 -PosIndex) -tt))
-     (-> -Pos -Index B : (-PS -tt (-and (-is-type 0 -PosIndex) (-is-type 1 -PosIndex))))
-     (-> -PosRat -Index B : (-PS -tt (-is-type 1 -PosIndex)))
-     (-> -Index -Nat B : (-PS (-is-type 1 -Index) -tt))
-     (-> -Nat -Index B : (-PS -tt (-and (-is-type 0 -Index) (-is-type 1 -PosIndex))))
-     (-> -NonNegRat -Index B : (-PS -tt (-is-type 1 -PosIndex)))
-     (-> -Fixnum -PosInt B : (-PS (-and (-is-type 0 -PosFixnum) (-is-type 1 -PosFixnum)) -tt))
-     (-> -Fixnum -PosReal B : (-PS (-is-type 0 -PosFixnum) -tt))
-     (-> -Fixnum -Nat B : (-PS (-and (-is-type 0 -NonNegFixnum) (-is-type 1 -NonNegFixnum)) -tt))
-     (-> -Fixnum -NonNegReal B : (-PS (-is-type 0 -NonNegFixnum) -tt))
-     (-> -Nat -Fixnum B : (-PS -tt (-and (-is-type 0 -NonNegFixnum) (-is-type 1 -PosFixnum))))
-     (-> -NonNegRat -Fixnum B : (-PS -tt (-is-type 1 -PosFixnum)))
-     (-> -Fixnum -NonPosInt B : (-PS -tt (-and (-is-type 0 -NegFixnum) (-is-type 1 -NonPosFixnum))))
-     (-> -Fixnum -NonPosRat B : (-PS -tt (-is-type 0 -NegFixnum)))
-     (-> -NegInt -Fixnum B : (-PS (-and (-is-type 0 -NegFixnum) (-is-type 1 -NegFixnum)) -tt))
-     (-> -NegReal -Fixnum B : (-PS (-is-type 1 -NegFixnum) -tt))
-     (-> -NonPosInt -Fixnum B : (-PS (-and (-is-type 0 -NonPosFixnum) (-is-type 1 -NonPosFixnum)) -tt))
-     (-> -NonPosReal -Fixnum B : (-PS (-is-type 1 -NonPosFixnum) -tt))
-     (-> -PosInfinity -Real B : (-PS (-not-type 1 -InexactRealNan) (-is-type 1 -InexactRealNan)))
-     (-> -Real -NegInfinity B : (-PS (-not-type 0 -InexactRealNan) (-is-type 0 -InexactRealNan)))
-     (-> -Real -PosInfinity B : (-PS (-is-type 0 -PosInfinity) (-not-type 0 -PosInfinity)))
-     (-> -NegInfinity -Real B : (-PS (-is-type 1 -NegInfinity) (-not-type 1 -NegInfinity)))
+     (-> ([x : -One] [y : -Int]) B : (-PS (-is-type y (Un -One -NonPosInt)) (-is-type y -PosInt)))
+     (-> ([x : -Int] [y : -One]) B : (-PS (-is-type x -PosInt) (-is-type x -NonPosInt)))
+     (-> ([x : -Real] [y : -Zero]) B : (-PS (-is-type x -NonNegReal) (-is-type x -NegReal)))
+     (-> ([x : -Zero] [y : -Real]) B : (-PS (-is-type y -NonPosReal) (-is-type y -PosReal)))
+     (-> ([x : -Real] [y : -RealZero]) B : (-PS (-is-type x -NonNegReal) -tt)) ;; False says nothing because of NaN
+     (-> ([x : -RealZero] [y : -Real]) B : (-PS (-is-type x -NonPosReal) -tt)) ;; False says nothing because of NaN
+     (-> ([x : -Byte] [y : -PosByte]) B : (-PS (-is-type x -PosByte) -tt))
+     (-> ([x : -Byte] [y : -Byte]) B : (-PS -tt (-is-type y -PosByte)))
+     (-> ([x : -Byte] [y : -PosInt]) B : (-PS (-and (-is-type x -PosByte) (-is-type y -PosByte)) -tt))
+     (-> ([x : -Byte] [y : -PosReal]) B : (-PS (-is-type x -PosByte) -tt))
+     (-> ([x : -PosInt] [y : -Byte]) B : (-PS -tt (-and (-is-type x -PosByte) (-is-type y -PosByte))))
+     (-> ([x : -PosRat] [y : -Byte]) B : (-PS -tt (-is-type y -PosByte)))
+     (-> ([x : -Byte] [y : -Nat]) B : (-PS (-is-type y -Byte) -tt))
+     (-> ([x : -Nat] [y : -Byte]) B : (-PS -tt (-and (-is-type x -Byte) (-is-type y -PosByte))))
+     (-> ([x : -NonNegRat] [y : -Byte]) B : (-PS -tt (-is-type y -PosByte)))
+     (-> ([x : -Index] [y : -PosIndex]) B : (-PS (-is-type x -PosIndex) -tt))
+     (-> ([x : -Index] [y : -Index]) B : (-PS -tt (-is-type y -PosIndex)))
+     (-> ([x : -Index] [y : -Pos]) B : (-PS (-and (-is-type x -PosIndex) (-is-type y -PosIndex)) -tt))
+     (-> ([x : -Index] [y : -PosReal]) B : (-PS (-is-type x -PosIndex) -tt))
+     (-> ([x : -Pos] [y : -Index]) B : (-PS -tt (-and (-is-type x -PosIndex) (-is-type y -PosIndex))))
+     (-> ([x : -PosRat] [y : -Index]) B : (-PS -tt (-is-type y -PosIndex)))
+     (-> ([x : -Index] [y : -Nat]) B : (-PS (-is-type y -Index) -tt))
+     (-> ([x : -Nat] [y : -Index]) B : (-PS -tt (-and (-is-type x -Index) (-is-type y -PosIndex))))
+     (-> ([x : -NonNegRat] [y : -Index]) B : (-PS -tt (-is-type y -PosIndex)))
+     (-> ([x : -Fixnum] [y : -PosInt]) B : (-PS (-and (-is-type x -PosFixnum) (-is-type y -PosFixnum)) -tt))
+     (-> ([x : -Fixnum] [y : -PosReal]) B : (-PS (-is-type x -PosFixnum) -tt))
+     (-> ([x : -Fixnum] [y : -Nat]) B : (-PS (-and (-is-type x -NonNegFixnum) (-is-type y -NonNegFixnum)) -tt))
+     (-> ([x : -Fixnum] [y : -NonNegReal]) B : (-PS (-is-type x -NonNegFixnum) -tt))
+     (-> ([x : -Nat] [y : -Fixnum]) B : (-PS -tt (-and (-is-type x -NonNegFixnum) (-is-type y -PosFixnum))))
+     (-> ([x : -NonNegRat] [y : -Fixnum]) B : (-PS -tt (-is-type y -PosFixnum)))
+     (-> ([x : -Fixnum] [y : -NonPosInt]) B : (-PS -tt (-and (-is-type x -NegFixnum) (-is-type y -NonPosFixnum))))
+     (-> ([x : -Fixnum] [y : -NonPosRat]) B : (-PS -tt (-is-type x -NegFixnum)))
+     (-> ([x : -NegInt] [y : -Fixnum]) B : (-PS (-and (-is-type x -NegFixnum) (-is-type y -NegFixnum)) -tt))
+     (-> ([x : -NegReal] [y : -Fixnum]) B : (-PS (-is-type y -NegFixnum) -tt))
+     (-> ([x : -NonPosInt] [y : -Fixnum]) B : (-PS (-and (-is-type x -NonPosFixnum) (-is-type y -NonPosFixnum)) -tt))
+     (-> ([x : -NonPosReal] [y : -Fixnum]) B : (-PS (-is-type y -NonPosFixnum) -tt))
+     (-> ([x : -PosInfinity] [y : -Real]) B : (-PS (-not-type y -InexactRealNan) (-is-type y -InexactRealNan)))
+     (-> ([x : -Real] [y : -NegInfinity]) B : (-PS (-not-type x -InexactRealNan) (-is-type x -InexactRealNan)))
+     (-> ([x : -Real] [y : -PosInfinity]) B : (-PS (-is-type x -PosInfinity) (-not-type x -PosInfinity)))
+     (-> ([x : -NegInfinity] [y : -Real]) B : (-PS (-is-type y -NegInfinity) (-not-type y -NegInfinity)))
      (>=-type-pattern -Int -PosInt -Nat -NegInt -NonPosInt -Zero)
      (>=-type-pattern -Rat -PosRat -NonNegRat -NegRat -NonPosRat -Zero)
      (>=-type-pattern -Flonum -PosFlonum -NonNegFlonum -NegFlonum -NonPosFlonum #:no-false-props? #t)
@@ -969,10 +971,10 @@
 
 [* (from-cases
     (-> -One)
-    (-> N N : -true-propset : (-arg-path 0))
+    (-> ([x : N]) N : -true-propset : (-id-path x))
     (commutative-case -Zero N -Zero)
-    (-> N -One N : -true-propset : (-arg-path 0))
-    (-> -One N N : -true-propset : (-arg-path 1))
+    (-> ([x : N] [y : -One]) N : -true-propset : (-id-path x))
+    (-> ([x : -One] [y : N]) N : -true-propset : (-id-path y))
     (-> -PosByte -PosByte -PosIndex)
     (-> -Byte -Byte -Index)
     (-> -PosByte -PosByte -PosByte -PosFixnum)
@@ -1032,10 +1034,10 @@
     (varop N))]
 [+ (from-cases
     (-> -Zero)
-    (-> N N : -true-propset : (-arg-path 0))
+    (-> ([x : N]) N : -true-propset : (-id-path x))
     (binop -Zero)
-    (-> N -Zero N : -true-propset : (-arg-path 0))
-    (-> -Zero N N : -true-propset : (-arg-path 1))
+    (-> ([x : N] [y : -Zero]) N : -true-propset : (-id-path x))
+    (-> ([x : -Zero] [y : N]) N : -true-propset : (-id-path y))
     (-> -PosByte -PosByte -PosIndex)
     (-> -Byte -Byte -Index)
     (-> -PosByte -PosByte -PosByte -PosIndex)
@@ -1101,7 +1103,7 @@
     (negation-pattern -PosInexactReal -NegInexactReal -NonNegInexactReal -NonPosInexactReal)
     (negation-pattern -PosReal -NegReal -NonNegReal -NonPosReal)
 
-    (-> N -Zero N : -true-propset : (-arg-path 0))
+    (-> ([x : N] [y : -Zero]) N : -true-propset : (-id-path x))
     (-> -One -One -Zero)
     (-> -PosByte -One -Byte)
     (-> -PosIndex -One -Index)
@@ -1138,7 +1140,7 @@
 [/ (from-cases ; very similar to multiplication, without closure properties for integers
     (commutative-case -Zero N -Zero)
     (unop -One)
-    (-> N -One N : -true-propset : (-arg-path 0))
+    (-> ([x : N] [y : -One]) N : -true-propset : (-id-path x))
     (varop-1+ -PosRat)
     (varop-1+ -NonNegRat)
     (-> -NegRat -NegRat)
@@ -1193,78 +1195,80 @@
     (varop-1+ N))]
 
 [max
- (from-cases (map varop (list -Zero -One))
-             (commutative-case -One -Zero)
-             (commutative-case -PosByte -Byte)
-             (commutative-case -PosIndex -Index)
-             (commutative-case -PosFixnum -Fixnum)
-             (commutative-case -NonNegFixnum -Fixnum)
-             (map varop (list -Index -NegFixnum -NonPosFixnum -PosFixnum -NonNegFixnum -Fixnum))
-             (commutative-case -PosInt -Int)
-             (commutative-case -Nat -Int)
-             (map varop (list -NegInt -NonPosInt -PosInt -Nat -Int))
-             ;; we could have more cases here. for instance, when mixing PosInt
-             ;; and NegRats, we get a result of type PosInt (not just PosRat)
-             ;; there's a lot of these, but they may not be worth including
-             (commutative-case -PosRat -Rat)
-             (commutative-case -NonNegRat -Rat)
-             (map varop (list -NegRat -NonPosRat -PosRat -NonNegRat -Rat
-                                 -FlonumPosZero -FlonumNegZero -FlonumZero))
-             ;; inexactness is contagious: (max 3 2.3) => 3.0
-             ;; we could add cases to encode that
-             (commutative-case -PosFlonum -Flonum)
-             (commutative-case -NonNegFlonum -Flonum)
-             (map varop (list -NegFlonum -NonPosFlonum -PosFlonum -NonNegFlonum -Flonum
-                              -SingleFlonumPosZero -SingleFlonumNegZero -SingleFlonumZero))
-             (varop -PosSingleFlonum)
-             (commutative-case -PosSingleFlonum -SingleFlonum)
-             (varop -NonNegSingleFlonum)
-             (commutative-case -NonNegSingleFlonum -SingleFlonum)
-             (map varop (list -NegSingleFlonum -NonPosSingleFlonum -SingleFlonum
-                              -InexactRealPosZero -InexactRealNegZero -InexactRealZero))
-             (commutative-case -PosInexactReal -InexactReal)
-             (commutative-case -NonNegInexactReal -InexactReal)
-             (map varop (list -NegInexactReal -NonPosInexactReal -PosInexactReal -NonNegInexactReal
-                              -InexactReal -RealZero))
-             (commutative-case -PosReal -Real)
-             (commutative-case -NonNegReal -Real)
-             (map varop (list -NegReal -NonPosReal -PosReal -NonNegReal -Real)))]
+ (from-cases
+  (map varop (list -Zero -One))
+  (commutative-case -One -Zero)
+  (commutative-case -PosByte -Byte)
+  (commutative-case -PosIndex -Index)
+  (commutative-case -PosFixnum -Fixnum)
+  (commutative-case -NonNegFixnum -Fixnum)
+  (map varop (list -Index -NegFixnum -NonPosFixnum -PosFixnum -NonNegFixnum -Fixnum))
+  (commutative-case -PosInt -Int)
+  (commutative-case -Nat -Int)
+  (map varop (list -NegInt -NonPosInt -PosInt -Nat -Int))
+  ;; we could have more cases here. for instance, when mixing PosInt
+  ;; and NegRats, we get a result of type PosInt (not just PosRat)
+  ;; there's a lot of these, but they may not be worth including
+  (commutative-case -PosRat -Rat)
+  (commutative-case -NonNegRat -Rat)
+  (map varop (list -NegRat -NonPosRat -PosRat -NonNegRat -Rat
+                   -FlonumPosZero -FlonumNegZero -FlonumZero))
+  ;; inexactness is contagious: (max 3 2.3) => 3.0
+  ;; we could add cases to encode that
+  (commutative-case -PosFlonum -Flonum)
+  (commutative-case -NonNegFlonum -Flonum)
+  (map varop (list -NegFlonum -NonPosFlonum -PosFlonum -NonNegFlonum -Flonum
+                   -SingleFlonumPosZero -SingleFlonumNegZero -SingleFlonumZero))
+  (varop -PosSingleFlonum)
+  (commutative-case -PosSingleFlonum -SingleFlonum)
+  (varop -NonNegSingleFlonum)
+  (commutative-case -NonNegSingleFlonum -SingleFlonum)
+  (map varop (list -NegSingleFlonum -NonPosSingleFlonum -SingleFlonum
+                   -InexactRealPosZero -InexactRealNegZero -InexactRealZero))
+  (commutative-case -PosInexactReal -InexactReal)
+  (commutative-case -NonNegInexactReal -InexactReal)
+  (map varop (list -NegInexactReal -NonPosInexactReal -PosInexactReal -NonNegInexactReal
+                   -InexactReal -RealZero))
+  (commutative-case -PosReal -Real)
+  (commutative-case -NonNegReal -Real)
+  (map varop (list -NegReal -NonPosReal -PosReal -NonNegReal -Real)))]
 [min
- (from-cases (map varop (list -Zero -One))
-             (commutative-case -Zero -One)
-             (map varop (list -PosByte -Byte -PosIndex -Index -PosFixnum -NonNegFixnum))
-             (commutative-case -NegFixnum -Fixnum)
-             (commutative-case -NonPosFixnum -Fixnum)
-             (commutative-case -PosByte -PosInt)
-             (commutative-case -Byte -Nat)
-             (commutative-case -PosFixnum -PosInt)
-             (commutative-case -NonNegFixnum -Nat)
-             (map varop (list -NegFixnum -NonPosFixnum -Fixnum -PosInt -Nat))
-             (commutative-case -NegInt -Int)
-             (commutative-case -NonPosInt -Int)
-             (map varop (list -NegInt -NonPosInt -Int -PosRat -NonNegRat))
-             (commutative-case -NegRat -Rat)
-             (commutative-case -NonPosRat -Rat)
-             (map varop (list -NegRat -NonPosRat -Rat
-                              -FlonumPosZero -FlonumNegZero -FlonumZero
-                              -PosFlonum -NonNegFlonum))
-             (commutative-case -NegFlonum -Flonum)
-             (commutative-case -NonPosFlonum -Flonum)
-             (map varop (list -NegFlonum -NonPosFlonum -Flonum
-                              -SingleFlonumPosZero -SingleFlonumNegZero -SingleFlonumZero
-                              -PosSingleFlonum -NonNegSingleFlonum))
-             (commutative-case -NegSingleFlonum -SingleFlonum)
-             (commutative-case -NonPosSingleFlonum -SingleFlonum)
-             (map varop (list -NegSingleFlonum -NonPosSingleFlonum -SingleFlonum
-                              -InexactRealPosZero -InexactRealNegZero -InexactRealZero
-                              -PosInexactReal -NonNegInexactReal))
-             (commutative-case -NegInexactReal -InexactReal)
-             (commutative-case -NonPosInexactReal -InexactReal)
-             (map varop (list -NegInexactReal -NonPosInexactReal -InexactReal
-                              -RealZero -PosReal -NonNegReal))
-             (commutative-case -NegReal -Real)
-             (commutative-case -NonPosReal -Real)
-             (map varop (list -NegReal -NonPosReal -Real)))]
+ (from-cases
+  (map varop (list -Zero -One))
+  (commutative-case -Zero -One)
+  (map varop (list -PosByte -Byte -PosIndex -Index -PosFixnum -NonNegFixnum))
+  (commutative-case -NegFixnum -Fixnum)
+  (commutative-case -NonPosFixnum -Fixnum)
+  (commutative-case -PosByte -PosInt)
+  (commutative-case -Byte -Nat)
+  (commutative-case -PosFixnum -PosInt)
+  (commutative-case -NonNegFixnum -Nat)
+  (map varop (list -NegFixnum -NonPosFixnum -Fixnum -PosInt -Nat))
+  (commutative-case -NegInt -Int)
+  (commutative-case -NonPosInt -Int)
+  (map varop (list -NegInt -NonPosInt -Int -PosRat -NonNegRat))
+  (commutative-case -NegRat -Rat)
+  (commutative-case -NonPosRat -Rat)
+  (map varop (list -NegRat -NonPosRat -Rat
+                   -FlonumPosZero -FlonumNegZero -FlonumZero
+                   -PosFlonum -NonNegFlonum))
+  (commutative-case -NegFlonum -Flonum)
+  (commutative-case -NonPosFlonum -Flonum)
+  (map varop (list -NegFlonum -NonPosFlonum -Flonum
+                   -SingleFlonumPosZero -SingleFlonumNegZero -SingleFlonumZero
+                   -PosSingleFlonum -NonNegSingleFlonum))
+  (commutative-case -NegSingleFlonum -SingleFlonum)
+  (commutative-case -NonPosSingleFlonum -SingleFlonum)
+  (map varop (list -NegSingleFlonum -NonPosSingleFlonum -SingleFlonum
+                   -InexactRealPosZero -InexactRealNegZero -InexactRealZero
+                   -PosInexactReal -NonNegInexactReal))
+  (commutative-case -NegInexactReal -InexactReal)
+  (commutative-case -NonPosInexactReal -InexactReal)
+  (map varop (list -NegInexactReal -NonPosInexactReal -InexactReal
+                   -RealZero -PosReal -NonNegReal))
+  (commutative-case -NegReal -Real)
+  (commutative-case -NonPosReal -Real)
+  (map varop (list -NegReal -NonPosReal -Real)))]
 
 [add1 (from-cases
        (-> -Zero -One)
@@ -1664,7 +1668,7 @@
   (N . -> . N))]
 [integer-sqrt
  (from-cases
-  (-> (Un -RealZero -One) (Un -RealZero -One) : -true-propset : (-arg-path 0))
+  (-> ([x : (Un -RealZero -One)]) (Un -RealZero -One) : -true-propset : (-id-path x))
   (unop -Byte)
   (-NonNegFixnum . -> . -Index)
   (-NonNegRat . -> . -Nat)
@@ -1674,8 +1678,8 @@
   (-Real . -> . N))] ; defined on inexact integers too, but not complex
 [integer-sqrt/remainder
  (from-cases
-  (-RealZero . -> . (make-Values (list (-result -RealZero -true-propset (-arg-path 0))
-                                       (-result -RealZero -true-propset (-arg-path 0)))))
+  (-> ([x : -RealZero]) (make-Values (list (-result -RealZero -true-propset (-id-path x))
+                                           (-result -RealZero -true-propset (-id-path x)))))
   (-One . -> . (-values (list -One -Zero)))
   (-Byte . -> . (-values (list -Byte -Byte)))
   (-Index . -> . (-values (list -Index -Index)))
@@ -1899,9 +1903,9 @@
   (-> (Un -NonPosRat -NonPosFlonum -NonPosSingleFlonum -NonPosInexactReal -NonPosReal) -NonPosInt)
   (-> (Un -Rat -Flonum -SingleFlonum -InexactReal -Real) -Int))]
 
-[nan? (make-pred-ty (list -Real) B -InexactRealNan)]
+[nan? (pred-> (list -Real) B -InexactRealNan)]
 
-[infinite? (make-pred-ty (list -Real) B (Un -PosInfinity -NegInfinity))]
+[infinite? (pred-> (list -Real) B (Un -PosInfinity -NegInfinity))]
 
 ;; racket/fixnum
 [fx+ (fx+-type)]
@@ -2027,7 +2031,7 @@
 [unsafe-flrandom (flrandom-type)]
 
 ; racket/extflonum
-[extflonum? (make-pred-ty -ExtFlonum)]
+[extflonum? (pred-> -ExtFlonum)]
 [extflonum-available? (-> B)]
 [pi.t -PosExtFlonum]
 

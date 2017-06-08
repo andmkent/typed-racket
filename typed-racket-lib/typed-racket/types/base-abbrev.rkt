@@ -154,13 +154,16 @@
 ;; or just trust the user of 'dep->'
 (define-syntax (dep-> stx)
   (syntax-parse stx
+    [(_ dom rng)
+     (syntax/loc stx (dep-> dom #f rng : -tt-propset : -empty-obj))]
     [(_ dom rng _:c props)
      (syntax/loc stx (dep-> dom #f rng : props : -empty-obj))]
     [(_ dom rng _:c props _:c object)
      (syntax/loc stx (dep-> dom #f rng : props : object))]
     [(_ dom rst rng _:c props)
      (syntax/loc stx (dep-> dom rst rng : props : object))]
-    [(_ ([x:id _:c ty:expr] ...) ~!
+    [(_ ([x:id _:c ty:expr] ...)
+        ~!
         rst
         rng
         _:c props
@@ -180,11 +183,14 @@
 
 (define-syntax (-> stx)
   (syntax-parse stx
+    [(_ (~and dom ([x _:c ty] ...)) ~! rst ...)
+     (syntax/loc stx (dep-> dom rst ...))]
     [(_ dom rng _:c props _:c objects)
      (syntax/loc stx (dep-> dom rng : props : objects))]
-    [(_ dom rng :c props)
-     (syntax/loc stx (dep-> dom  rng : props))]
+    [(_ dom rng _:c props)
+     (syntax/loc stx (dep-> dom rng : props))]
     [(_ dom ... rng)
+     #:when (not (memq ': (syntax->datum #'(dom ...))))
      (syntax/loc stx (->* (list dom ...) rng))]))
 
 (define-syntax (->... stx)
