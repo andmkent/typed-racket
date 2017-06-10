@@ -278,9 +278,9 @@
                       ,(type->sexp rng))]
     ;; TODO, ArrowDep with dependent domains (they
     ;; currently don't exist, so it's not an issue)
-    [(ArrowDep: dom '() rst rng)
+    [(ArrowDep: dom #f rst rng)
      `(make-ArrowDep (list ,@(map type->sexp dom))
-                     (list)
+                     #f
                      ,(and rst (type->sexp rst))
                      ,(type->sexp rng))]))
 

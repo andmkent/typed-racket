@@ -8,10 +8,10 @@
          (except-in (types abbrev subtype tc-result)
                     -> ->* one-of/c))
 
-(provide possible-domains)
-
 (provide/cond-contract
-  [cleanup-type ((Type?) ((or/c #f Type?) any/c) . ->* . Type?)])
+ [possible-arrows (->* ((listof Arrow?) Type?) (boolean?) (listof Arrow?))]
+ [cleanup-type ((Type?) ((or/c #f Type?) any/c) . ->* . Type?)])
+
 
 ;; to avoid long and confusing error messages, in the case of functions with
 ;; multiple similar domains (<, >, +, -, etc.), we show only the domains that
@@ -40,70 +40,74 @@
 ;; of domains that would *satisfy* the expected type, e.g. for the :query-type
 ;; forms.
 ;; TODO separating pruning and collapsing into separate functions may be nicer
-(define (possible-domains doms rests drests rngs expected [permissive? #t])
+(define (possible-arrows orig-arrows expected [permissive? #t])
 
   ;; is fun-ty subsumed by a function type in others?
   (define (is-subsumed-in? fun-ty others)
     ;; a case subsumes another if the first one is a subtype of the other
-    (ormap (lambda (x) (subtype x fun-ty))
-           others))
+    (for/or ([ty (in-list others)])
+      (subtype ty fun-ty)))
 
-  ;; currently does not take advantage of multi-valued or arbitrary-valued expected types,
+  ;; currently does not take advantage of multi-valued
+  ;; or arbitrary-valued expected types,
   (define expected-ty
     (and expected
          (match expected
            [(tc-result1: t) t]
-           [(tc-any-results: (or #f (TrueProp:))) #t] ; anything is a subtype of expected
-           [_ #f]))) ; don't know what it is, don't do any pruning
+           [(tc-any-results: (or #f (TrueProp:)))
+            ; anything is a subtype of expected
+            #t]
+           ; don't know what it is, don't do any pruning
+           [_ #f])))
   (define (returns-subtype-of-expected? fun-ty)
     (or (not expected) ; no expected type, anything is fine
         (eq? expected-ty #t) ; expected is tc-anyresults, anything is fine
         (and expected-ty ; not some unknown expected tc-result
              (match fun-ty
-               [(Function: (list (arr: _ rng _ _ _)))
-                (let ([rng (match rng
-                             [(Values: (list (Result: t _ _)))
-                              t]
-                             [(ValuesDots: (list (Result: t _ _)) _ _)
-                              t]
-                             [_ #f])])
-                  (and rng (subtype rng expected-ty)))]))))
+               [(Function:
+                 (list (app unsafe-Arrow-rng
+                            (or (Values: (list (Result: t _ _)))
+                                (ValuesDots: (list (Result: t _ _)) _ _)))))
+                (subtype t expected-ty)]
+               [_ #f]))))
 
-  (define orig (map list doms rngs rests drests))
-
+  ;; remove kw args and latent props from rng
   (define cases
-    (map (compose make-Function list make-arr)
-         doms
-         (map (match-lambda ; strip props
-               [(AnyValues: f) (-AnyValues -tt)]
-               [(Values: (list (Result: t _ _) ...))
-                (-values t)]
-               [(ValuesDots: (list (Result: t _ _) ...) _ _)
-                (-values t)])
-              rngs)
-         rests drests (make-list (length doms) null)))
+    (for/list ([arrow (in-list orig-arrows)])
+      (match arrow
+        [(? ArrowSimp?) arrow]
+        [(ArrowStar: dom rst kws rng)
+         (if (null? kws)
+             arrow
+             (make-ArrowStar dom rst '() rng))]
+        [(ArrowDep: dom deps rst rng)
+         (make-ArrowDep
+          dom
+          deps
+          rst
+          (match rng
+            [(AnyValues: f) (-AnyValues -tt)]
+            [(Values: (list (Result: t _ _) ...))
+             (-values t)]
+            [(ValuesDots: (list (Result: t _ _) ...) _ _)
+             (-values t)]))])))
 
   ;; iterate in lock step over the function types we analyze and the parts
   ;; that we will need to print the error message, to make sure we throw
   ;; away cases consistently
   (define-values (candidates* parts-acc*)
-    (for/fold ([candidates '()] ; from cases
-               [parts-acc '()]) ; from orig
-        ([c (in-list cases)]
-         ;; the parts we'll need to print the error message
-         [p (in-list orig)])
-      (if (returns-subtype-of-expected? c)
-          (values (cons c candidates) ; we keep this one
-                  (cons p parts-acc))
-          ;; we discard this one
-          (values candidates parts-acc))))
+    (for/lists (_1 _2)
+      ([c (in-list cases)]
+       [p (in-list orig-arrows)]
+       #:when (returns-subtype-of-expected? c))
+      (values c p)))
 
   ;; if none of the cases return a subtype of the expected type, still do some
   ;; merging, but do it on the entire type
   ;; only do this if we're in permissive mode
   (define-values (candidates parts-acc)
     (if (and permissive? (null? candidates*))
-        (values cases orig)
+        (values cases orig-arrows)
         (values candidates* parts-acc*)))
 
   ;; among the domains that fit with the expected type, we only need to
@@ -111,57 +115,50 @@
   ;; since we only care about permissiveness of domains, we reconstruct
   ;; function types with a return type of any then test for subtyping
   (define fun-tys-ret-any
-    (map (match-lambda
-          [(Function: (list (arr: dom _ rest drest _)))
-           (make-Function (list (make-arr dom
-                                          (-values (list Univ))
-                                          rest drest null)))])
-         candidates))
+    (let ([univ (-values (list Univ))])
+      (for/list ([arrow (in-list candidates)])
+        (match arrow
+          [(ArrowSimp: dom _)
+           (make-ArrowSimp dom univ)]
+          [(ArrowStar: dom rst _ _)
+           (make-ArrowStar dom rst '() univ)]
+          [(ArrowDep: dom deps rst _)
+           (make-ArrowDep dom deps rst univ)]))))
 
-  ;; Heuristic: often, the last case in the definition (first at this
-  ;; point, we've reversed the list) is the most general of all, subsuming
-  ;; all the others. If that's the case, just go with it. Otherwise, go
-  ;; the slow way.
+  ;; Heuristic: often, the last case in the definition is the most
+  ;; general, subsuming all the others. If that's the case, just go
+  ;; with it. Otherwise, go the slow way.
   (cond [(and (not (null? fun-tys-ret-any))
-              (andmap (lambda (c) (subtype (car fun-tys-ret-any) c))
-                      fun-tys-ret-any))
-         ;; Yep. Return early.
-         (map list (car parts-acc))]
-        
+              (let ([final (last fun-tys-ret-any)])
+                (and (for/and ([fty (in-list fun-tys-ret-any)])
+                       (subtype final fty))
+                     ;; yep, return early
+                     final)))]
         [else
-         ;; No luck, do it the slow way
-         (define parts-res
-           ;; final pass, we only need the parts to print the error message
-           (for/fold ([parts-res '()])
-               ([c (in-list fun-tys-ret-any)]
-                [p (in-list parts-acc)]
-                ;; if a case is a supertype of another, we discard it
-                #:unless (is-subsumed-in? c (remove c fun-tys-ret-any)))
+         ;; final pass, we only need the parts to print the error message
+         (for/list
+             ([c (in-list fun-tys-ret-any)]
+              [p (in-list parts-acc)]
+              ;; if a case is a supertype of another, we discard it
+              #:unless (is-subsumed-in? c (remove c fun-tys-ret-any)))
+           p)]))
 
-             (cons p parts-res)))
 
-         (call-with-values
-           (λ ()
-             (for/lists (_1 _2 _3 _4) ([xs (in-list (reverse parts-res))])
-               (values (car xs) (cadr xs) (caddr xs) (cadddr xs))))
-           list)]))
-
-;; Wrapper over possible-domains that works on types.
 (define (cleanup-type t [expected #f] [permissive? #t])
   (match t
     ;; function type, prune if possible.
-    [(Function/arrs: doms rngs rests drests kws)
-     (match-let ([(list pdoms rngs rests drests)
-                  (possible-domains doms rests drests rngs
-                                    (and expected (ret expected))
-                                    permissive?)])
-       (if (= (length pdoms) (length doms))
-           ;; pruning didn't improve things, return the original
-           ;; (Note: pruning may have reordered clauses, so may not be `equal?' to
-           ;;  the original, which may confuse `:print-type''s pruning detection)
-           t
-           ;; pruning helped, return pruned type
-           (make-Function (map make-arr
-                               pdoms rngs rests drests (make-list (length pdoms) null)))))]
-    ;; not a function type. keep as is.
+    [(Function: arrows)
+     (define parrows
+       (possible-arrows arrows
+                        (and expected (ret expected))
+                        permissive?))
+     (cond
+       [(= (length parrows) (length arrows))
+        ;; pruning didn't improve things, return the original
+        ;; (Note: pruning may have reordered clauses, so may not be `equal?' to
+        ;;  the original, which may confuse `:print-type''s pruning detection)
+        t]
+       ;; pruning helped, return pruned type
+       [else (make-Function parrows)])]
+    ;; not a function type, keep as is.
     [_ t]))

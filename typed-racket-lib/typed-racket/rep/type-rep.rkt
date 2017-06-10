@@ -579,7 +579,7 @@
 ;; 'dom-deps' records the dependencies between
 ;; the domains (note: to be used)
 (def-arrow ArrowDep ([dom (listof Type?)]
-                     [dom-deps null?]
+                     [dom-deps #f]
                      [rst (or/c #f Type?)]
                      [rng SomeValues?])
   [#:frees (f)
@@ -617,7 +617,7 @@
 (define/cond-contract (Arrow-has-dependent-dom? arrow)
   (-> Arrow? boolean?)
   (match arrow
-    [(ArrowDep: _ dep _ _) (not (null? dep))]
+    [(ArrowDep: _ dep _ _) (and dep #t)]
     [_ #f]))
 
 ;; return the rest argument for a given arrow,
