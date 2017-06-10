@@ -32,9 +32,10 @@
                              [debug-printer print-result]
                              [debug-printer print-object]
                              [debug-printer print-pathelem]
+                             [debug-printer print-arrow]
                              [debug-pretty-format-type pretty-format-rep]))
       #'(provide print-type print-prop print-propset print-object print-pathelem
-                 pretty-format-rep print-values print-result)))
+                 pretty-format-rep print-values print-result print-arrow)))
 (provide-printer)
 
 (provide print-complex-props? type-output-sexpr-tweaker
@@ -89,6 +90,8 @@
 (define (print-pathelem pe port write?)
   (display (pathelem->sexp pe) port))
 
+(define (print-arrow a port write?)
+  (display (arrow->sexp a) port))
 
 (define (print-prop prop port write?)
   (display (prop->sexp prop) port))
@@ -263,13 +266,42 @@
                  (remove next candidates)
                  (cons next coverage))])))
 
-;; arr->sexp : arr -> s-expression
+;; arrow->sexp : Arrow -> s-expression
 ;; Convert an arr (see type-rep.rkt) to its printable form
-(define (arr->sexp arr)
-  (match arr
-    [(arr: dom rng rest drest kws)
+(define (arrow->sexp arrow)
+  (define (rng->sexp rng)
+    (match rng
+      [(AnyValues: (? TrueProp?)) '(AnyValues)]
+      [(AnyValues: p) `(AnyValues : ,(prop->sexp p))]
+      [(Values: (or (list (Result: t (PropSet: (? TrueProp?) (? TrueProp?)) (? Empty?)))
+                    (list (Result: (and (== -False) t) (PropSet: (? FalseProp?) (? TrueProp?)) (? Empty?)))
+                    (list (Result: (and t (app (λ (t) (overlap? t -False)) #f))
+                                   (PropSet: (? TrueProp?) (? FalseProp?))
+                                   (? Empty?)))))
+       (list (type->sexp t))]
+      [(Values: (list (Result: t ps (? Empty?))))
+       (if (print-complex-props?)
+           `(,(type->sexp t) : ,(propset->sexp ps))
+           (list (type->sexp t)))]
+      [(Values: (list (Result: t ps o)))
+       (if (print-complex-props?)
+           `(,(type->sexp t) : ,(propset->sexp ps) ,(object->sexp o))
+           (list (type->sexp t)))]
+      [_ (list (values->sexp rng))]))
+  (define (rst/drst->sexp t)
+    (match t
+      [#f '()]
+      [(? Type?)
+       `(,(type->sexp t) *)]
+      [(RestDots: dty db)
+       `(,(type->sexp dty) ... ,db)]))
+  (match arrow
+    [(ArrowSimp: dom rng)
+     `(-> ,@(map type->sexp dom)
+          ,@(rng->sexp rng))]
+    [(ArrowStar: dom rst kws rng)
      (append
-      (list '->)
+      '(->)
       (map type->sexp dom)
       ;; Format keyword types as strings because the square
       ;; brackets are significant for printing. Note that
@@ -281,52 +313,79 @@
            (if req?
                (format "~a ~a" k (type->sexp t))
                (format "[~a ~a]" k (type->sexp t)))]))
-      (if rest  `(,(type->sexp rest) *)                       null)
-      (if drest `(,(type->sexp (car drest)) ... ,(cdr drest)) null)
-      (match rng
-        [(AnyValues: (? TrueProp?)) '(AnyValues)]
-        [(AnyValues: p) `(AnyValues : ,(prop->sexp p))]
-        [(Values: (or (list (Result: t (PropSet: (? TrueProp?) (? TrueProp?)) (? Empty?)))
-                      (list (Result: (and (== -False) t) (PropSet: (? FalseProp?) (? TrueProp?)) (? Empty?)))
-                      (list (Result: (and t (app (λ (t) (overlap? t -False)) #f))
-                                     (PropSet: (? TrueProp?) (? FalseProp?))
-                                     (? Empty?)))))
-         (list (type->sexp t))]
-        [(Values: (list (Result: t
-                                 (PropSet:
-                                  (TypeProp: (Path: pth1 (cons 0 0)) ft1)
-                                  (NotTypeProp: (Path: pth2 (cons 0 0)) ft2))
-                                 (? Empty?))))
-         ;; Only print a simple prop for single argument functions,
-         ;; since parse-type only accepts simple latent props on single
-         ;; argument functions.
-         #:when (and (equal? pth1 pth2)
-                     (equal? ft1 ft2)
-                     (= 1 (length dom)))
-         (if (null? pth1)
-             `(,(type->sexp t) : ,(type->sexp ft1))
-             `(,(type->sexp t) : ,(type->sexp ft1) @
-               ,@(map pathelem->sexp pth1)))]
-        ;; Print asymmetric props with only a positive prop as a
-        ;; special case (even when complex printing is off) because it's
-        ;; useful to users who use functions like `prop`.
-        [(Values: (list (Result: t
-                                 (PropSet:
-                                  (TypeProp: (Path: '() (cons 0 0)) ft)
-                                  (? TrueProp?))
-                                 (? Empty?))))
-         #:when (= 1 (length dom))
-         `(,(type->sexp t) : #:+ ,(type->sexp ft))]
-        [(Values: (list (Result: t ps (? Empty?))))
-         (if (print-complex-props?)
-             `(,(type->sexp t) : ,(propset->sexp ps))
-             (list (type->sexp t)))]
-        [(Values: (list (Result: t ps o)))
-         (if (print-complex-props?)
-             `(,(type->sexp t) : ,(propset->sexp ps) ,(object->sexp o))
-             (list (type->sexp t)))]
-        [_ (list (values->sexp rng))]))]
-    [else `(Unknown Function Type: ,(struct->vector arr))]))
+      (rst/drst->sexp rst)
+      (rng->sexp rng))]
+    [(Values: (list (Result: t
+                             (PropSet:
+                              (TypeProp: (Path: pth1 (cons 0 0)) ft1)
+                              (NotTypeProp: (Path: pth2 (cons 0 0)) ft2))
+                             (? Empty?))))
+     ;; Only print a simple prop for single argument functions,
+     ;; since parse-type only accepts simple latent props on single
+     ;; argument functions.
+     #:when (and (equal? pth1 pth2)
+                 (equal? ft1 ft2)
+                 (= 1 (length dom)))
+     (if (null? pth1)
+         `(,(type->sexp t) : ,(type->sexp ft1))
+         `(,(type->sexp t) : ,(type->sexp ft1) @
+           ,@(map pathelem->sexp pth1)))]
+    ;; Print asymmetric props with only a positive prop as a
+    ;; special case (even when complex printing is off) because it's
+    ;; useful to users who use functions like `prop`.
+    [(Values: (list (Result: t
+                             (PropSet:
+                              (TypeProp: (Path: '() (cons 0 0)) ft)
+                              (? TrueProp?))
+                             (? Empty?))))
+     #:when (= 1 (length dom))
+     `(,(type->sexp t) : #:+ ,(type->sexp ft))]
+    ;; print a simple prop for single argument functions,
+    ;; since parse-type only accepts simple latent props on single
+    ;; argument functions.
+    [(ArrowDep: (list dty) #f #f
+                (Values:
+                 (list
+                  (Result: t
+                           (PropSet:
+                            (TypeProp: (Path: pth (cons 0 0)) prop-ty)
+                            (NotTypeProp: (Path: pth (cons 0 0)) prop-ty))
+                           (? Empty?)))))
+     `(-> ,(type->sexp dty)
+          ,(type->sexp t)
+          :
+          ,(type->sexp prop-ty)
+          ,@(if (null? pth)
+                '()
+                (cons '@ (map pathelem->sexp pth))))]
+    ;; Print asymmetric props with only a positive prop as a
+    ;; special case (even when complex printing is off) because it's
+    ;; useful to users who use functions like `prop`.
+    [(ArrowDep: (list dty) #f #f
+                (Values:
+                 (list
+                  (Result: t
+                           (PropSet:
+                            (TypeProp: (Path: '() (cons 0 0)) prop-ty)
+                            (? TrueProp?))
+                           (? Empty?)))))
+     `(-> ,(type->sexp dty)
+          ,(type->sexp t)
+          : #:+ ,(type->sexp prop-ty))]
+    [(? ArrowDep?)
+     (with-fresh-ids (length (ArrowDep-dom arrow)) ids
+       (with-instantiated-ArrowDeps ids
+         ;; TODO, something w/ dep when they're supported
+         ([(ArrowDep: dom _ rst rng) arrow])
+         (let ([dom (for/list ([id (in-list ids)]
+                               [id-ty (in-list dom)])
+                      (format "[~a : ~a]"
+                              (syntax-e id)
+                              (type->sexp id-ty)))])
+           `(-> ,dom
+                ,@(rst/drst->sexp rst)
+                ,(values->sexp rng)))))]
+    [else `(Unknown Function Type: ,(struct->vector arrow))]))
 
 ;; format->* : (Listof arr) -> S-Expression
 ;; Format arrs that correspond to a ->* type
