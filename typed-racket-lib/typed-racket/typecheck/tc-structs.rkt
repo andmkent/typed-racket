@@ -182,11 +182,11 @@
      ;; the list of names w/ types
      (make-def-binding (struct-names-struct-type names) (make-StructType sty))
      (make-def-binding (struct-names-predicate names)
-                       (make-pred-ty (if (not covariant?)
-                                         ;; FIXME: does this make sense with prefabs?
-                                         (make-StructTop sty)
-                                         (subst-all (make-simple-substitution
-                                                     tvars (map (const Univ) tvars)) poly-base))))
+                       (pred-> (if (not covariant?)
+                                   ;; FIXME: does this make sense with prefabs?
+                                   (make-StructTop sty)
+                                   (subst-all (make-simple-substitution
+                                               tvars (map (const Univ) tvars)) poly-base))))
      (append
       (for/list ([g (in-list (struct-names-getters names))]
                  [t (in-list self-fields)]

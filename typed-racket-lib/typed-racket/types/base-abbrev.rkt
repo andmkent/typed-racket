@@ -216,8 +216,7 @@
         path:expr
         #:arg arg:id)
      #:when (not (null? (syntax->list #'(x ...))))
-     (define n (length (syntax->list #'(x ...))))
-     (with-syntax ([(idx ...) (range (sub1 n))])
+     (with-syntax ([(idx ...) (range (length (syntax->list #'(x ...))))])
        (syntax/loc stx
          (let ([obj (-acc-path path
                                (-id-path (let ([x (cons 0 idx)] ...)
@@ -227,7 +226,16 @@
                         rng
                         #:props (-PS (-not-type obj (-val #f))
                                      (-is-type obj (-val #f)))
-                        #:object obj))))))]))
+                        #:object obj))))))]
+    [(_ dom:expr rng:expr path:expr)
+     (syntax/loc stx
+       (let ([obj (-acc-path path (-id-path (cons 0 0)))])
+         (make-Function
+          (list (-Arr dom
+                      rng
+                      #:props (-PS (-not-type obj (-val #f))
+                                   (-is-type obj (-val #f)))
+                      #:object obj)))))]))
 
 (define (cl->* . args)
   (make-Function (apply append (map Function-arrows args))))

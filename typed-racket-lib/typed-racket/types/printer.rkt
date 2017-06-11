@@ -315,34 +315,6 @@
                (format "[~a ~a]" k (type->sexp t)))]))
       (rst/drst->sexp rst)
       (rng->sexp rng))]
-    [(Values: (list (Result: t
-                             (PropSet:
-                              (TypeProp: (Path: pth1 (cons 0 0)) ft1)
-                              (NotTypeProp: (Path: pth2 (cons 0 0)) ft2))
-                             (? Empty?))))
-     ;; Only print a simple prop for single argument functions,
-     ;; since parse-type only accepts simple latent props on single
-     ;; argument functions.
-     #:when (and (equal? pth1 pth2)
-                 (equal? ft1 ft2)
-                 (= 1 (length dom)))
-     (if (null? pth1)
-         `(,(type->sexp t) : ,(type->sexp ft1))
-         `(,(type->sexp t) : ,(type->sexp ft1) @
-           ,@(map pathelem->sexp pth1)))]
-    ;; Print asymmetric props with only a positive prop as a
-    ;; special case (even when complex printing is off) because it's
-    ;; useful to users who use functions like `prop`.
-    [(Values: (list (Result: t
-                             (PropSet:
-                              (TypeProp: (Path: '() (cons 0 0)) ft)
-                              (? TrueProp?))
-                             (? Empty?))))
-     #:when (= 1 (length dom))
-     `(,(type->sexp t) : #:+ ,(type->sexp ft))]
-    ;; print a simple prop for single argument functions,
-    ;; since parse-type only accepts simple latent props on single
-    ;; argument functions.
     [(ArrowDep: (list dty) #f #f
                 (Values:
                  (list
@@ -387,29 +359,35 @@
                 ,(values->sexp rng)))))]
     [else `(Unknown Function Type: ,(struct->vector arrow))]))
 
-;; format->* : (Listof arr) -> S-Expression
-;; Format arrs that correspond to a ->* type
-(define (format->* arrs)
+;; format->* : (Listof Arrow) -> S-Expression
+;; Format Arrows that correspond to a ->* type
+;; NOTE: there seem to be some unstated assumptions
+;; about the input list of arrows that
+(define (format->* arrows)
   ;; see type-contract.rkt, which does something similar and this code
   ;; was stolen from/inspired by/etc.
-  (match* ((first arrs) (last arrs))
-    [((arr: first-dom rng rst _ kws)
-      (arr: last-dom _ _ _ _))
-     (define-values (mand-kws opt-kws) (partition-kws kws))
-     (define opt-doms (drop last-dom (length first-dom)))
-     `(->*
-       ,(append* (for/list ([dom (in-list first-dom)])
-                   (type->sexp dom))
-                 (for/list ([mand-kw (in-list mand-kws)])
-                   (match-define (Keyword: k t _) mand-kw)
-                   (list k (type->sexp t))))
-       ,(append* (for/list ([opt-dom (in-list opt-doms)])
-                   (type->sexp opt-dom))
-                 (for/list ([opt-kw (in-list opt-kws)])
-                   (match-define (Keyword: k t _) opt-kw)
-                   (list k (type->sexp t))))
-       ,@(if rst (list '#:rest (type->sexp rst)) null)
-       ,(values->sexp rng))]))
+  (define fst (first arrows))
+  (define lst (last arrows))
+  (define rng (unsafe-Arrow-rng fst))
+  (define rst (unsafe-Arrow-rst fst))
+  (define kws (Arrow-kws fst))
+  (define-values (mand-kws opt-kws) (partition-kws kws))
+  (define fst-dom (unsafe-Arrow-dom fst))
+  (define lst-dom (unsafe-Arrow-dom lst))
+  (define opt-doms (drop lst-dom (length fst-dom)))
+  `(->*
+    ,(append* (for/list ([dom (in-list fst-dom)])
+                (type->sexp dom))
+              (for/list ([mand-kw (in-list mand-kws)])
+                (match-define (Keyword: k t _) mand-kw)
+                (list k (type->sexp t))))
+    ,(append* (for/list ([opt-dom (in-list opt-doms)])
+                (type->sexp opt-dom))
+              (for/list ([opt-kw (in-list opt-kws)])
+                (match-define (Keyword: k t _) opt-kw)
+                (list k (type->sexp t))))
+    ,@(if rst (list '#:rest (type->sexp rst)) null)
+    ,(values->sexp rng)))
 
 ;; cover-case-lambda : (Listof arr) -> (Listof s-expression)
 ;; Try to cover a case-> type with ->* types
@@ -436,7 +414,7 @@
     (cond [a-match
            (match-define (list pre sub post) a-match)
            (append (loop pre) (list (format->* sub)) (loop post))]
-          [else (map arr->sexp left-to-cover)])))
+          [else (map arrow->sexp left-to-cover)])))
 
 ;; case-lambda->sexp : Type -> S-expression
 ;; Convert a case-> type to an s-expression
@@ -445,7 +423,7 @@
     [(Function: arities)
      (match arities
        [(list) '(case->)]
-       [(list a) (arr->sexp a)]
+       [(list a) (arrow->sexp a)]
        [(and arrs (list a b ...))
         (define cover (cover-case-lambda arrs))
         (if (> (length cover) 1)
@@ -613,7 +591,6 @@
      (parameterize ([current-print-type-fuel
                      (sub1 (current-print-type-fuel))])
        (case-lambda->sexp type))]
-    [(arr: _ _ _ _ _) `(arr ,(arr->sexp type))]
     [(Vector: e) `(Vectorof ,(t->s e))]
     [(HeterogeneousVector: e) `(Vector ,@(map t->s e))]
     [(Box: e) `(Boxof ,(t->s e))]

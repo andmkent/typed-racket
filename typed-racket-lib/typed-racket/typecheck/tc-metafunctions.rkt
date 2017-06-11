@@ -61,14 +61,14 @@
              [(TrueProp:) (partition! rst)]
              [(TypeProp: obj (Refine: t p))
               (partition! (list (-is-type obj t)
-                                (instantiate-rep/obj p obj t)))
+                                (instantiate/obj p obj)))
               (partition! rst)]
              [(? TypeProp? p)
               (set! atoms (cons p atoms))
               (partition! rst)]
              [(NotTypeProp: obj (Refine: t p))
               (partition! (list (-or (-not-type obj t)
-                                     (negate-prop (instantiate-rep/obj p obj t)))))
+                                     (negate-prop (instantiate/obj p obj)))))
               (when atoms (partition! rst))]
              [(? NotTypeProp? p)
               (set! atoms (cons p atoms))

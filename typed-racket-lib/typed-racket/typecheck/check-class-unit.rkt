@@ -882,11 +882,11 @@
        ;; This case is more complicated than for public fields because private
        ;; fields support occurrence typing. The object is set as the field's
        ;; accessor id, so that *its* range type is refined for occurrence typing.
-       (->acc (list Univ)
+       (->acc ([x : Univ])
               (or (and maybe-type (car maybe-type))
                   Univ)
               (list -field)
-              #:var getter-id)
+              #:arg getter-id)
        (-> Univ (or (and maybe-type (car maybe-type)) -Bottom)
            -Void))))
 
@@ -1136,7 +1136,8 @@
 (define (setter->type id)
   (define f-type (lookup-id-type/lexical id))
   (match f-type
-    [(Function: (list (arr: (list _ type) _ _ _ _)))
+    [(Function: (list (or (ArrowSimp: (list _ type) _)
+                          (ArrowStar: (list _ type) _ _ _))))
      type]
     [#f (int-err "setter->type ~a" (syntax-e id))]))
 
@@ -1152,8 +1153,9 @@
            (define type
              (tc-expr/check/t init-val (ret (->* null init-type))))
            (match type
-             [(Function: (list (arr: _ (Values: (list (Result: result _ _)))
-                                     _ _ _)))
+             [(Function:
+               (list (or (ArrowSimp: _     (Values: (list (Result: result _ _))))
+                         (ArrowStar: _ _ _ (Values: (list (Result: result _ _)))))))
               (check-below result init-type)]
              [_ (int-err "unexpected init value ~a"
                          (syntax->datum init-val))])]
@@ -1586,12 +1588,15 @@
 ;; Fix up a method's arity from a regular function type
 (define (function->method type self-type)
   (match type
-    [(Function: (list arrs ...))
-     (define fixed-arrs
-       (for/list ([arr arrs])
-         (match-define (arr: doms rng rest drest kws) arr)
-         (make-arr (cons self-type doms) rng rest drest kws)))
-     (make-Function fixed-arrs)]
+    [(Function: arrows)
+     ;; add self-type to arrow domains
+     (make-Function
+      (map (match-lambda
+             [(ArrowSimp: dom rng)
+              (make-ArrowSimp (cons self-type dom) rng)]
+             [(ArrowStar: dom rst kws rng)
+              (make-ArrowStar (cons self-type dom) rst kws rng)])
+           arrows))]
     [(Poly-names: ns body)
      (make-Poly ns (function->method body self-type))]
     [(PolyDots-names: ns body)
@@ -1604,12 +1609,15 @@
 ;; Turn a "real" method type back into a function type
 (define (method->function type)
   (match type
-    [(Function: (list arrs ...))
-     (define fixed-arrs
-       (for/list ([arr arrs])
-         (match-define (arr: doms rng rest drest kws) arr)
-         (make-arr (cdr doms) rng rest drest kws)))
-     (make-Function fixed-arrs)]
+    [(Function: arrows)
+     ;; remove self-type from arrow domains
+     (make-Function
+      (map (match-lambda
+             [(ArrowSimp: dom rng)
+              (make-ArrowSimp (cdr dom) rng)]
+             [(ArrowStar: dom rst kws rng)
+              (make-ArrowStar (cdr dom) rst kws rng)])
+           arrows))]
     [(Poly-names: ns body)
      (make-Poly ns (method->function body))]
     [(PolyDots-names: ns body)

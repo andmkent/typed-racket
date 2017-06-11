@@ -157,9 +157,9 @@
     [(_ in:expr out:expr t:expr)
      (syntax/loc stx
        (dep-> ([x : in]) out : (-PS (-is-type x t) (-not-type x t))))]
-    [(_ ([x:id (~datum :) in:expr]) out:expr t:expr o:expr)
+    [(_ ([x:id (~datum :) in:expr] ...) out:expr t:expr o:expr)
      (syntax/loc stx
-       (dep-> ([x : in]) out : (-PS (-is-type o t) (-not-type o t))))]))
+       (dep-> ([x : in] ...) out : (-PS (-is-type o t) (-not-type o t))))]))
 
 (define/decl -true-propset (-PS -tt -ff))
 (define/decl -false-propset (-PS -ff -tt))
