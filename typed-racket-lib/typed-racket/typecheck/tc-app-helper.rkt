@@ -17,11 +17,45 @@
     ((syntax? stx-list? arr? (listof tc-results/c) (or/c #f tc-results/c))
      (#:check boolean?)
      . ->* . full-tc-results/c)])
-(define (tc/funapp1 f-stx args-stx ftype0 argtys expected #:check [check? #t])
+(define (tc/funapp1 f-stx args-stx ftype0 arg-ress expected #:check [check? #t])
   ;; update tooltip-table with inferred function type
   (add-typeof-expr f-stx (ret (make-Function (list ftype0))))
-  (match* (ftype0 argtys)
-    ;; we check that all kw args are optional
+  (match* ftype0
+    [(or (and (ArrowSimp: dom rng) (bind rst #f) (bind kws '()))
+         (and (ArrowDep: dom #f rst rng) (bind kws '()))
+         (ArrowStar: dom rst kws rng))
+     #:when (and (or (not rst) (Type? rst))
+                 (not (ormap Keyword-required? kws)))
+     (when check?
+       (cond [(and (not rest) (not (= (length dom) (length arg-ress))))
+              (tc-error/fields "could not apply function"
+                               #:more "wrong number of arguments provided"
+                               "expected" (length dom)
+                               "given" (length arg-ress)
+                               #:delayed? #t)]
+             [(< (length arg-ress) (length dom))
+              (tc-error/fields "could not apply function"
+                               #:more "wrong number of arguments provided"
+                               "expected at least" (length dom)
+                               "given" (length arg-ress)
+                               #:delayed? #t)])
+       (for ([dom-t (in-list/rest dom rst)]
+             [a (in-syntax args-stx)]
+             [arg-res (in-list arg-ress)]
+             #:when dom-t)
+         (parameterize ([current-orig-stx a])
+           (check-below arg-res dom-t))))
+     (define-values (os ts)
+       (cond
+         [(ArrowDep? ftype0)
+          (for/lists (os ts)
+                     ([arg-res (in-list arg-ress)])
+            (match arg-res
+              [(tc-result1: t _ o) (values t o)]))]
+         [else (values '() '())]))
+     (values->tc-results rng os ts)]
+    [(ArrowDep: dom #f rst rng)
+     ]
     [((arr: dom rng rest #f (and kws (list (Keyword: _ _ #f) ...)))
       (list (tc-result1: t-a phi-a o-a) ...))
      
@@ -52,24 +86,26 @@
                           [ta (in-list/rest t-a Univ)])
                          (values oa ta))])
            (values->tc-results rng o-a t-a)))]
-    ;; this case should only match if the function type has mandatory keywords
-    ;; but no keywords were provided in the application
-    [((arr: _ _ _ _
-            ;; at least one mandatory keyword
-            (app (λ (kws)
-                   (for/or ([keyword (in-list kws)])
-                     (match keyword
-                       [(Keyword: kw _ #t) kw]
-                       [_ #f])))
-                 (? values req-kw))) _)
-     (when check?
+    [(ArrowStar: _ _ kws _)
+     (when (and check? (ormap Keyword-required? kws))
+       (define mand-kws (for/list ([kw (in-list kws)]
+                                   #:when (Keyword-required? kw))
+                          (Keyword-kw kw)))
+       (define missing-msg
+         (match mand-kws
+           [(list kw) (format "missing keyword: ~a" kw)]
+           [(list kws ... end)
+            (string-append
+             "missing keywords: "
+             (apply string-append
+                    (for/list ([kw (in-list kws)])
+                      (format "~a, " kw)))
+             (format "and ~a" end))]))
        (tc-error/fields "could not apply function"
                         #:more "a required keyword was not supplied"
-                        "missing keyword" req-kw))]
-    [((arr: _ _ _ drest '()) _)
-     (int-err "funapp with drest args ~a ~a NYI" drest argtys)]
-    [((arr: _ _ _ _ kws) _)
-     (int-err "funapp with keyword args ~a NYI" kws)]))
+                        missing-msg))]
+    [(ArrowStar: _ (? RestDots? dr) _ _)
+     (int-err "funapp with drest args ~a ~a NYI" dr arg-ress)]))
 
 
 (define (make-printable t)

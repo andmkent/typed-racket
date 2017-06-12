@@ -49,7 +49,9 @@
        (ret t ps o dty dbound)]
       [_ (int-err "invalid res in values->tc-results: ~a" res)]))
   
-  (subst-tc-results res targets))
+  (if (null? os)
+      res
+      (subst-tc-results res targets)))
 
 ;; Restrict the objects in v refering to the current functions
 ;; arguments to be of the types ts. Uses an identity substitution (yuck)

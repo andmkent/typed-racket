@@ -10,9 +10,10 @@
          (typecheck error-message tc-envops))
 
 (provide/cond-contract
- [check-below (-->i ([s (-or/c Type? full-tc-results/c)]
-                     [t (s) (if (Type? s) Type? tc-results/c)])
-                    [_ (s) (if (Type? s) Type? full-tc-results/c)])]
+ [check-below (-case->
+               (--> Type? Type? Type?)
+               (--> full-tc-results/c Type? Type)
+               (--> full-tc-results/c tc-results/c full-tc-results/c))]
  [cond-check-below (-->i ([s (-or/c Type? full-tc-results/c)]
                           [t (s) (-or/c #f (if (Type? s) Type? tc-results/c))])
                          [_ (s) (-or/c #f (if (Type? s) Type? full-tc-results/c))])])
@@ -181,7 +182,12 @@
      (unless (subtype t1 t2)
        (expected-but-got t2 t1))
      expected]
+
+    [((tc-result1: t1 _ o1) (? Type? t2))
+     (subtype t1 t2 o1)]
+
     [((tc-results: ts fs os dty dbound) (tc-results: ts* fs* os* dty* dbound*))
      (int-err "dotted types with different bounds/propositions/objects in check-below nyi: ~a ~a" tr1 expected)]
+
     [(a b) (int-err "unexpected input for check-below: ~a ~a" a b)]))
 
