@@ -120,6 +120,7 @@
 [ChannelTop -ChannelTop]
 [Async-ChannelTop -Async-ChannelTop]
 [VectorTop -VectorTop]
+[Mutable-VectorTop -Mutable-VectorTop]
 [HashTableTop -HashTableTop]
 [MPairTop -MPairTop]
 [Thread-CellTop -ThreadCellTop]
@@ -166,6 +167,8 @@
 
 [Listof -Listof]
 [Vectorof (-poly (a) (make-Vector a))]
+[Immutable-Vectorof (-poly (a) (make-Immutable-Vector a))]
+[Mutable-Vectorof (-poly (a) (make-Mutable-Vector a))]
 [FlVector -FlVector]
 [ExtFlVector -ExtFlVector]
 [FxVector -FxVector]

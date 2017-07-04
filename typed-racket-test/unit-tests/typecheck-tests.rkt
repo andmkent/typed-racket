@@ -539,26 +539,30 @@
         [tc-e (void) -Void]
         [tc-e (void 3 4) -Void]
         [tc-e (void #t #f '(1 2 3)) -Void]
-        [tc-e/t #() (make-HeterogeneousVector (list))]
+        [tc-e/t #() (make-Immutable-HeterogeneousVector (list))]
+        [tc-e/t #(4) (make-Immutable-HeterogeneousVector (list -Integer))]
         [tc-err #(3)
                 #:ret (tc-ret (make-HeterogeneousVector (list -Integer -Integer)))
                 #:expected (tc-ret (make-HeterogeneousVector (list -Integer -Integer)))]
         [tc-err #(3 4 5)
                 #:ret (tc-ret (make-HeterogeneousVector (list -Integer -Integer)))
                 #:expected (tc-ret (make-HeterogeneousVector (list -Integer -Integer)))]
-        [tc-e/t #(3 4 5) (make-HeterogeneousVector (list -Integer -Integer -Integer))]
+        [tc-e/t #(3 4 5) (make-Immutable-HeterogeneousVector (list -Integer -Integer -Integer))]
+        [tc-e/t (vector 3 4 5) (make-Mutable-HeterogeneousVector (list -Integer -Integer -Integer))]
+        [tc-e/t #(3 4 5) (make-Immutable-HeterogeneousVector (list -Integer -Integer -Integer))]
         [tc-e/t '(2 3 4) (-lst* -PosByte -PosByte -PosByte)]
         [tc-e/t '(2 3 #t) (-lst* -PosByte -PosByte (-val #t))]
-        [tc-e/t #(2 3 #t) (make-HeterogeneousVector (list -Integer -Integer -Boolean))]
-        [tc-e (vector 2 "3" #t) (make-HeterogeneousVector (list -Integer -String -Boolean))]
-        [tc-e (vector) (make-HeterogeneousVector (list))]
-        [tc-e (vector) #:ret (-tc-any-results -tt) #:expected (-tc-any-results #f)]
+        [tc-e/t #(2 3 #t) (make-Immutable-HeterogeneousVector (list -Integer -Integer -Boolean))]
+        [tc-e (vector 2 "3" #t) (make-Mutable-HeterogeneousVector (list -Integer -String -Boolean))]
+        [tc-e (vector) (make-Mutable-HeterogeneousVector (list))]
         [tc-err (vector)
                 #:ret (tc-ret -Integer)
            #:expected (tc-ret -Integer)]
-        [tc-e (vector-immutable 2 "3" #t) (make-HeterogeneousVector (list -Integer -String -Boolean))]
-        [tc-e (make-vector 4 1) (-vec -Integer)]
-        [tc-e (build-vector 4 (lambda (x) 1)) (-vec -Integer)]
+        [tc-e (vector-immutable 1 "3" #t) (make-Immutable-HeterogeneousVector (list (-val 1) -String (-val #t)))]
+        [tc-e (vector 2 "3" #t) (make-Mutable-HeterogeneousVector (list -Integer -String -Boolean))]
+        [tc-e (make-vector 4 1) (-Mutable-vec -Integer)]
+        [tc-e #(4 1) (-Immutable-vec* -Integer -Integer)]
+        [tc-e (build-vector 4 (lambda (x) 1)) (-Mutable-vec -Integer)]
         [tc-e (let ([x : Any (vector 1 2 3)])
                 (if (vector? x)
                     (vector->list x)
@@ -1038,15 +1042,15 @@
         [tc-e/t #'3 (-Syntax -PosByte)]
         [tc-e/t #'(2 3 4) (-Syntax (-lst* (-Syntax -PosByte) (-Syntax -PosByte) (-Syntax -PosByte)))]
         [tc-e/t #'id (-Syntax (-val 'id))]
-        [tc-e/t #'#(1 2 3) (-Syntax (make-HeterogeneousVector (list (-Syntax -One) (-Syntax -PosByte) (-Syntax -PosByte))))]
-        [tc-e/t (ann #'#(1 2 3) (Syntaxof (Vectorof (Syntaxof (U 1 2 3 'foo)))))
-                (-Syntax (-vec (-Syntax (t:Un (-val 1) (-val 2) (-val 3) (-val 'foo)))))]
-        [tc-e/t (ann #'#(1 2 3) (Syntaxof (Vector (Syntaxof (U 1 'foo))
-                                                  (Syntaxof (U 2 'bar))
-                                                  (Syntaxof (U 3 'baz)))))
-                (-Syntax (make-HeterogeneousVector (list (-Syntax (t:Un (-val 1) (-val 'foo)))
-                                                         (-Syntax (t:Un (-val 2) (-val 'bar)))
-                                                         (-Syntax (t:Un (-val 3) (-val 'baz))))))]
+        [tc-e/t #'#(1 2 3) (-Syntax (make-Immutable-HeterogeneousVector (list (-Syntax -One) (-Syntax -PosByte) (-Syntax -PosByte))))]
+        [tc-e/t (ann #'#(1 2 3) (Syntaxof (Immutable-Vectorof (Syntaxof (U 1 2 3 'foo)))))
+                (-Syntax (-Immutable-vec (-Syntax (t:Un (-val 1) (-val 2) (-val 3) (-val 'foo)))))]
+        [tc-e/t (ann #'#(1 2 3) (Syntaxof (Immutable-Vector (Syntaxof (U 1 'foo))
+                                                            (Syntaxof (U 2 'bar))
+                                                            (Syntaxof (U 3 'baz)))))
+                (-Syntax (make-Immutable-HeterogeneousVector (list (-Syntax (t:Un (-val 1) (-val 'foo)))
+                                                                   (-Syntax (t:Un (-val 2) (-val 'bar)))
+                                                                   (-Syntax (t:Un (-val 3) (-val 'baz))))))]
         [tc-e/t #'#&2 (-Syntax (-box (-Syntax -PosByte)))]
         [tc-e/t (ann #'#&2 (Syntaxof (Boxof (Syntaxof (U 2 'foo)))))
                 (-Syntax (-box (-Syntax (t:Un (-val 2) (-val 'foo)))))]
@@ -1235,8 +1239,8 @@
               (-lst -Symbol)]
 
 
-        [tc-e (vector-filter path-string? (ann (vector "a" 4 5 "b") (Vectorof Any)))
-              (-vec (t:Un -Path -String))]
+        [tc-e (vector-filter path-string? (ann (vector "a" 4 5 "b") (Mutable-Vectorof Any)))
+              (-Mutable-vec (t:Un -Path -String))]
 
         [tc-e (sequence-filter module-path? (ann (vector "a" 4 5 "b") (Vectorof Any)))
               (-seq (t:Un -Module-Path))]
@@ -2098,9 +2102,9 @@
          (-val 1)]
 
         [tc-e (vector-append #(1) #(2))
-              (-vec -Integer)]
-        [tc-e/t (ann #() (Vectorof Integer))
-                (-vec -Integer)]
+              (-Mutable-vec -Integer)]
+        [tc-e/t (ann #() (Immutable-Vectorof Integer))
+                (-Immutable-vec -Integer)]
 
         [tc-e (let: ([x : Float 0.0])
                 (= 0 x))
@@ -2178,7 +2182,7 @@
                 (if (vector? x) (vector-ref x 0) #f))
               Univ]
         [tc-e ((inst vector Index) 0)
-              (-vec -Index)]
+              (-Mutable-vec -Index)]
         [tc-err ((inst list Void) 1 2 3)
           #:ret (tc-ret (-lst -Void))]
         [tc-e ((inst list Any) 1 2 3)
@@ -2204,14 +2208,22 @@
         [tc-e (split-at (list 0 2 3 4 5 6) 3)
               (list (-lst -Byte) (-lst -Byte))]
         [tc-e (vector-split-at (vector 2 3 4 5 6) 3)
-              (list (-vec -Integer) (-vec -Integer))]
+              (list (-Mutable-vec -Integer) (-Mutable-vec -Integer))]
 
         [tc-e/t (ann ((letrec ((x (lambda args 3))) x) 1 2) Byte) -Byte]
         [tc-e (vector-ref (ann (vector 'a 'b) (Vector Symbol Symbol)) 0)
               -Symbol]
+        [tc-err (vector-ref (ann (vector 'a 'b) (Immutable-Vector Symbol Symbol)) 4)]
+        [tc-err (vector-ref (ann (vector 'a 'b) (Mutable-Vector Symbol Symbol)) 4)]
         [tc-err (vector-ref (ann (vector 'a 'b) (Vector Symbol Symbol)) 4)]
+        [tc-err (vector-ref (ann (vector 'a 'b) (U (Immutable-Vector Symbol Symbol) (Mutable-Vector Symbol Symbol))) 4)]
+        [tc-err (vector-ref (ann (vector 'a 'b) (U (Mutable-Vector Symbol Symbol) (Immutable-Vector Symbol Symbol))) 4)]
+        [tc-e (vector-ref (ann (vector 'a 'b) (U (Mutable-Vector Symbol Symbol) (Vectorof Symbol))) 4)
+              -Symbol]
         [tc-e (vector-ref (ann (vector 'a 'b) (Vector Symbol Symbol)) (+ -1 2))
               -Symbol]
+        [tc-e (vector-set! (ann (vector 'a 'b) (Mutable-Vector Symbol Symbol)) 0 'c)
+              -Void]
         [tc-e (vector-set! (ann (vector 'a 'b) (Vector Symbol Symbol)) 0 'c)
               -Void]
         [tc-err (vector-set! (ann (vector 'a 'b) (Vector Symbol Symbol)) -4 'c)]
@@ -2457,7 +2469,7 @@
                     (lambda: ([s1 : (U Number Symbol String)] [s2 : Symbol])
                       (= (string-length (format "~a" s1))
                          (string-length (symbol->string s2)))))
-             (t:Un (-val #f) (-pair (one-of/c 'a 'b 'c) (-vec* -Symbol)))]
+             (t:Un (-val #f) (-pair (one-of/c 'a 'b 'c) (-Immutable-vec* -Symbol)))]
        ;; Reject `member` when needle not included in is-equal?'s argument type:
        [tc-err (member (ann 123 Number)
                        '("bb" "c" "ddd")
@@ -4015,6 +4027,66 @@
                    (hfun h)))
                (void))
              -Void]
+       ;; make sure immutable vectorofs generalize to vectorofs
+       [tc-e (let ()
+               (: v1 (Immutable-Vectorof Any))
+               (define v1 (vector-immutable))
+
+               (: vfun (-> (Vectorof Any) (Vectorof Any)))
+               (define (vfun h) h)
+
+               (define v2
+                 (for/fold : (Vectorof Any)
+                   ([v v1])
+                   ([_ (in-range 3)])
+                   (vfun v)))
+               (void))
+             -Void]
+       ;; make sure mutable vectorofs generalize to vectorofs
+       [tc-e (let ()
+               (: v1 (Mutable-Vectorof Any))
+               (define v1 (vector))
+
+               (: vfun (-> (Vectorof Any) (Vectorof Any)))
+               (define (vfun h) h)
+
+               (define v2
+                 (for/fold : (Vectorof Any)
+                   ([v v1])
+                   ([_ (in-range 3)])
+                   (vfun v)))
+               (void))
+             -Void]
+       ;; make sure immutable vectors generalize to vectors
+       [tc-e (let ()
+               (: v1 (Immutable-Vector))
+               (define v1 (vector-immutable))
+
+               (: vfun (-> (Vector) (Vector)))
+               (define (vfun h) h)
+
+               (define v2
+                 (for/fold : (Vector)
+                   ([v v1])
+                   ([_ (in-range 3)])
+                   (vfun v)))
+               (void))
+             -Void]
+       ;; make sure mutable vectors generalize to vectors
+       [tc-e (let ()
+               (: v1 (Mutable-Vector))
+               (define v1 (vector))
+
+               (: vfun (-> (Vector) (Vector)))
+               (define (vfun h) h)
+
+               (define v2
+                 (for/fold : (Vector)
+                   ([v v1])
+                   ([_ (in-range 3)])
+                   (vfun v)))
+               (void))
+             -Void]
        )
 
   (test-suite
@@ -4062,14 +4134,14 @@
          (-Immutable-HT (-val ':a) (-val ':b))
          #:expected (t:Un (-val #f) (-Immutable-HT (-val ':a) (-val ':b)))]
    [tc-l #(:a :b)
-         (-vec (t:Un (-val ':a) (-val ':b) (-mu X (-vec (t:Un (-val ':a) (-val ':b) X)))))
-         #:expected (-mu X (-vec (t:Un (-val ':a) (-val ':b) X)))]
+         (-Immutable-vec (t:Un (-val ':a) (-val ':b) (-mu X (-Immutable-vec (t:Un (-val ':a) (-val ':b) X)))))
+         #:expected (-mu X (-Immutable-vec (t:Un (-val ':a) (-val ':b) X)))]
    [tc-l (#(:a) . :b)
-         (-pair (-vec (t:Un (-val ':a)
-                            (-mu X (-pair (-vec (t:Un (-val ':a) X)) (t:Un (-val ':b) X)))))
+         (-pair (-Immutable-vec (t:Un (-val ':a)
+                            (-mu X (-pair (-Immutable-vec (t:Un (-val ':a) X)) (t:Un (-val ':b) X)))))
                 (-val ':b))
-         #:expected (-mu X (-pair (-vec (t:Un (-val ':a) X)) (t:Un (-val ':b) X)))]
-   [tc-l/err #(1 2) #:expected (make-HeterogeneousVector (list -Number -Symbol))
+         #:expected (-mu X (-pair (-Immutable-vec (t:Un (-val ':a) X)) (t:Un (-val ':b) X)))]
+   [tc-l/err #(1 2) #:expected (make-Immutable-HeterogeneousVector (list -Number -Symbol))
                     #:msg #rx"expected: Symbol"]
    [tc-l #s(foo "a" a)
          (-prefab 'foo -String (-val 'a))]

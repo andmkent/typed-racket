@@ -179,6 +179,7 @@
       typed-racket/utils/opaque-object
       typed-racket/utils/evt-contract
       typed-racket/utils/hash-contract
+      typed-racket/utils/vec-contract
       typed-racket/utils/sealing-contract
       typed-racket/utils/promise-not-name-contract
       typed-racket/utils/simple-result-arrow
@@ -382,8 +383,12 @@
                           (for/hash ([(obj coeff) (in-terms terms)])
                             (values (obj->sc obj) coeff)))]))
       (define (hash-types->sc hts)
-        (if (or (null? hts) (null? (cdr hts)))
-          #false ;; too few types, don't merge
+        (cond
+         [(null? hts)
+          #f]
+         [(null? (cdr hts))
+          (t->sc (car hts))]
+         [else
           (let-values ([(kts vts)
                         (for/lists (_1 _2) ([ht (in-list hts)])
                           (match ht
@@ -393,7 +398,42 @@
                             (values k v)]
                            [_
                             (raise-arguments-error 'hash-types->sc "expected hash/kv?" "given" ht "element of" hts)]))])
-            (hash/sc (t->sc (apply Un kts)) (t->sc (apply Un vts))))))
+            (hash/sc (t->sc (apply Un kts)) (t->sc (apply Un vts))))]))
+      (define (hvec-types->scs orig-vts)
+        ;; Input: (?-HVector: . ts)
+        ;; Output: list of contracts, 1 contract for each length. (gee this is unclear)
+        (let loop ([vts orig-vts])
+          (match vts
+           ['()
+            '()]
+           [(cons (and vt/len (HeterogeneousVector: ts)) vts)
+            (define len (length ts))
+            (define-values [vts/same-len vts/different-len]
+              (partition (lambda (vt) (hvec/t? vt len)) vts))
+            (cons (apply vector/sc (apply map (lambda ts (t->sc/both (apply Un ts))) ts (map hvec->ts vts/same-len)))
+                  (hvec-types->scs vts/different-len))]
+           [(cons vt _)
+            (raise-arguments-error 'hvec-types->scs "expected hvec/t?" "given" vt "element of" orig-vts)])))
+      (define (hvec->ts hv)
+        (match hv
+         [(HeterogeneousVector: ts)
+          ts]))
+      (define (vec-types->sc vts)
+        (cond
+         [(null? vts)
+          #f]
+         [(null? (cdr vts))
+          (t->sc (car vts))]
+         [else
+          (let ([ts
+                 (for/list ([vt (in-list vts)])
+                   (match vt
+                    [(or (Immutable-Vector: t)
+                         (Mutable-Vector: t))
+                     t]
+                    [_
+                     (raise-arguments-error 'vec-types->sc "expected vec/t?" "given" vt "element of" vts)]))])
+            (vectorof/sc (t->sc (apply Un ts))))]))
       (define (only-untyped sc)
         (if (from-typed? typed-side)
             (and/sc sc any-wrap/sc)
@@ -472,11 +512,17 @@
            ;; - and `Any` makes a chaperone contract
            hash?/sc]
           [(Union-all: elems)
-           (define-values [hash-elems other-elems] (partition hash/kv? elems))
-           (define maybe-hash/sc (hash-types->sc hash-elems))
-           (if maybe-hash/sc
-             (apply or/sc maybe-hash/sc (map t->sc other-elems))
-             (apply or/sc (map t->sc elems)))]
+          ;; TODO far too much code duplication,
+          ;;  find someway to simplify & remove the helper functions
+           (define-values [maybe/sc other/sc]
+             (let*-values ([(hash-elems elems) (partition hash/kv? elems)]
+                           [(vec-elems elems) (partition vec/t? elems)]
+                           [(hvec-elems elems) (partition hvec/t? elems)])
+               (values (list* (hash-types->sc hash-elems)
+                              (vec-types->sc vec-elems)
+                              (hvec-types->scs hvec-elems))
+                       (map t->sc elems))))
+           (apply or/sc (append (filter values maybe/sc) other/sc))]
           [t (t->sc t)])]
        [(Intersection: ts raw-prop)
         (define-values (impersonators chaperones others)
@@ -525,8 +571,16 @@
        [(and t (? Fun?)) (t->sc/fun t)]
        [(Set: t) (set/sc (t->sc t))]
        [(Sequence: ts) (apply sequence/sc (map t->sc ts))]
-       [(Vector: t) (vectorof/sc (t->sc/both t))]
-       [(HeterogeneousVector: ts) (apply vector/sc (map t->sc/both ts))]
+       [(Immutable-HeterogeneousVector: ts)
+        (apply immutable-vector/sc (map t->sc ts))]
+       [(Immutable-Vector: t)
+        (immutable-vectorof/sc (t->sc t))]
+       [(Mutable-HeterogeneousVector: ts)
+        (apply mutable-vector/sc (map t->sc/both ts))]
+       [(Mutable-Vector: t)
+        (mutable-vectorof/sc (t->sc/both t))]
+       [(Mutable-VectorTop:)
+        (only-untyped mutable-vector?/sc)]
        [(Box: t) (box/sc (t->sc/both t))]
        [(Pair: t1 t2)
         (cons/sc (t->sc t1) (t->sc t2))]
@@ -547,7 +601,6 @@
                    (λ () (error 'type->static-contract
                                 "Recursive value lookup failed. ~a ~a" recursive-values v)))
          typed-side)]
-       [(VectorTop:) (only-untyped vector?/sc)]
        [(BoxTop:) (only-untyped box?/sc)]
        [(ChannelTop:) (only-untyped channel?/sc)]
        [(Async-ChannelTop:) (only-untyped async-channel?/sc)]
@@ -962,6 +1015,24 @@
    [(or (Immutable-HashTable: k v)
         (Mutable-HashTable: k v)
         (Weak-HashTable: k v))
+    #true]
+   [_
+    #false]))
+
+;; hvec/t? : Type [Natural] -> Boolean
+;; True if given type is a HeterogeneousVector type
+(define (hvec/t? ty [len #f])
+  (match ty
+   [(HeterogeneousVector: ts)
+    (or (not len) (= len (length ts)))]
+   [_
+    #false]))
+
+;; vec/t? : Type -> Boolean
+;; True if given type is a Vectorof type with known element type
+(define (vec/t? ty)
+  (match ty
+   [(Vector: t)
     #true]
    [_
     #false]))

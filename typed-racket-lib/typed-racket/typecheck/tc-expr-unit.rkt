@@ -387,22 +387,44 @@
      (match (and expected (resolve (intersect expected (-pair Univ Univ))))
        [(Pair: car-t cdr-t) (-pair (find-stx-type car car-t) (find-stx-type cdr cdr-t))]
        [_ (-pair (find-stx-type car) (find-stx-type cdr))])]
-    [(vector xs ...)
-     (match (and expected (resolve (intersect expected -VectorTop)))
-       [(Vector: t)
-        (make-Vector
-         (check-below
-          (apply Un
-                 (for/list ([x (in-list xs)])
-                   (find-stx-type x t)))
-          t))]
-       [(HeterogeneousVector: ts)
-        (make-HeterogeneousVector
-         (for/list ([x (in-list xs)]
-                    [t (in-list/rest ts #f)])
-           (cond-check-below (find-stx-type x t) t)))]
-       [_ (make-HeterogeneousVector (for/list ([x (in-list xs)])
-                                      (generalize (find-stx-type x #f))))])]
+    [(and (vector xs ...) v)
+     (cond
+      [#true ;(immutable? v)
+       (match (and expected (resolve (intersect expected (-Immutable-vec Univ))))
+        [(Immutable-Vector: t)
+         (make-Immutable-Vector
+          (check-below
+           (apply Un
+                  (for/list ([x (in-list xs)])
+                    (find-stx-type x t)))
+           t))]
+        [(Immutable-HeterogeneousVector: ts)
+         (make-Immutable-HeterogeneousVector
+          (for/list ([x (in-list xs)]
+                     [t (in-list/rest ts #f)])
+            (cond-check-below (find-stx-type x t) t)))]
+        [_
+         (make-Immutable-HeterogeneousVector
+          (for/list ([x (in-list xs)])
+            (generalize (find-stx-type x #f))))])]
+      [else
+       (match (and expected (resolve (intersect expected -Mutable-VectorTop)))
+        [(Mutable-Vector: t)
+         (make-Mutable-Vector
+          (check-below
+           (apply Un
+                  (for/list ([x (in-list xs)])
+                    (find-stx-type x t)))
+           t))]
+        [(Mutable-HeterogeneousVector: ts)
+         (make-Mutable-HeterogeneousVector
+          (for/list ([x (in-list xs)]
+                     [t (in-list/rest ts #f)])
+            (cond-check-below (find-stx-type x t) t)))]
+        [_
+         (make-Mutable-HeterogeneousVector
+          (for/list ([x (in-list xs)])
+            (generalize (find-stx-type x #f))))])])]
     [(box x)
      (match (and expected (resolve (intersect expected -BoxTop)))
        [(Box: t) (-box (check-below (find-stx-type x t) t))]
@@ -426,7 +448,7 @@
         [(Mutable-HashTable: k v)
          (value->HT/find-stx-type h -Mutable-HT k v)]
         [_
-         (value->HT/find-stx-type h -HT)])])]
+         (value->HT/find-stx-type h -HT)])])] ;; TODO should be mutable
     [(? prefab-struct-key)
      ;; FIXME is there a type for prefab structs?
      Univ]

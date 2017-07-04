@@ -14,7 +14,7 @@
 
   ;; Construcing frees
   combine-frees flip-variances
-  make-invariant make-constant 
+  make-invariant make-covariant make-constant
   instantiate-frees
   empty-free-vars
   single-free-var
@@ -101,6 +101,12 @@
     [(remove-frees inner name)
      (remove-frees (flip-variances inner) name)]))
 
+
+(define (make-covariant frees)
+  (combined-frees
+    (for/hasheq ([name (free-vars-names frees)])
+      (values name variance:co))
+    null))
 
 (define (make-invariant frees)
   (combined-frees

@@ -107,12 +107,18 @@
 
 
     ;; Vectors
-    (check-optimize (vectorof/sc any/sc)
-      #:pos any/sc
-      #:neg vector?/sc)
-    (check-optimize (vectorof/sc none/sc)
-      #:pos (vectorof/sc none/sc)
-      #:neg (vectorof/sc none/sc))
+    (let ()
+      (define-syntax-rule (make-?vectorof/sc-check ctc flat-ctc)
+        (begin
+          (check-optimize (ctc any/sc)
+            #:pos any/sc
+            #:neg flat-ctc)
+          (check-optimize (ctc none/sc)
+            #:pos (ctc none/sc)
+            #:neg (ctc none/sc))))
+      (make-?vectorof/sc-check immutable-vectorof/sc immutable-vector?/sc)
+      (make-?vectorof/sc-check mutable-vectorof/sc mutable-vector?/sc)
+      (make-?vectorof/sc-check vectorof/sc vector?/sc))
 
     ;; Heterogeneous Vectors
     ;; TODO fix ability to test equality here
@@ -120,9 +126,14 @@
     (check-optimize (vector/sc any/sc)
       #:pos any/sc
       #:neg (vector-length/sc 1))
-    (check-optimize (vector/sc none/sc)
-      #:pos (vector/sc none/sc)
-      #:neg (vector/sc none/sc))
+    (let ()
+      (define-syntax-rule (make-?vector/sc-check ctc)
+        (check-optimize (ctc none/sc)
+          #:pos (ctc none/sc)
+          #:neg (ctc none/sc)))
+      (make-?vector/sc-check immutable-vector/sc)
+      (make-?vector/sc-check mutable-vector/sc)
+      (make-?vector/sc-check vector/sc))
     ;; TODO fix ability to test equality here
     #;
     (check-optimize (vector/sc)

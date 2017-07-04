@@ -129,7 +129,8 @@
  mask:number
  mask:pair
  mask:mpair
- mask:vector
+ mask:mutable-vector
+ mask:immutable-vector
  mask:mutable-hash
  mask:immutable-hash
  mask:weak-hash

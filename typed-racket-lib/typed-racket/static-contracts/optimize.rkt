@@ -41,6 +41,8 @@
     [(cons/sc: (any/sc:) (any/sc:)) cons?/sc]
     [(listof/sc: (any/sc:)) list?/sc]
     [(list/sc: (and scs (any/sc:)) ...) (list-length/sc (length scs))]
+    [(immutable-vectorof/sc: (any/sc:)) immutable-vector?/sc]
+    [(mutable-vectorof/sc: (any/sc:)) mutable-vector?/sc]
     [(vectorof/sc: (any/sc:)) vector?/sc]
     [(vector/sc: (and scs (any/sc:)) ...) (vector-length/sc (length scs))]
     [(set/sc: (any/sc:)) set?/sc]
