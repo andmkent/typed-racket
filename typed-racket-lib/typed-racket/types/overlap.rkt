@@ -113,7 +113,7 @@
     #f]
    ;; these are single-valued sequences
    [((Sequence: (list _ _ _ ...))
-     (or (? Pair?) (? Vector?) (? VectorTop?)))
+     (or (? Pair?) (Vector: _) (VectorTop:)))
     #:no-order
     #f]
    ;; be conservative about other kinds of sequences
@@ -129,7 +129,7 @@
     #:no-order
     #f]
    [((Val-able: (not (? hash?)))
-     (or (? Mutable-HashTable?)
+     (or (? Mutable-HashTable?) ;; TODO simplify?
          (? Mutable-HashTableTop?)
          (? Immutable-HashTable?)
          (? Weak-HashTable?)

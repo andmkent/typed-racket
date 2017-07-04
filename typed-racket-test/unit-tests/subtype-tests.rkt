@@ -169,6 +169,8 @@
     [make-Promise ()]
     [make-Ephemeron ()]
     [make-CustodianBox ()]
+    [make-Immutable-Vector ()]
+    [make-Immutable-HashTable () ()]
     [make-Set ()]
     [make-Evt ()]
     [make-Syntax ()]
@@ -176,6 +178,7 @@
    (invariant-tests
     [make-MPair () () #:top -MPairTop]
     [make-Vector () #:top -VectorTop]
+    [make-Mutable-Vector () #:top -Mutable-VectorTop]
     [make-Box () #:top -BoxTop]
     [make-Channel () #:top -ChannelTop]
     [make-Async-Channel () #:top -Async-ChannelTop]
@@ -309,6 +312,12 @@
    [FAIL (make-HeterogeneousVector (list t1a)) (make-HeterogeneousVector (list t1b t1a))]
    [FAIL (make-HeterogeneousVector (list t1a t2)) (make-HeterogeneousVector (list t1b t1a))]
    [FAIL (make-HeterogeneousVector (list t2 t1a)) (make-HeterogeneousVector (list t1b t1a))]
+   [(make-Immutable-HeterogeneousVector (list t1a t1b)) (make-Immutable-HeterogeneousVector (list t1b t1a))]
+   [(make-Immutable-HeterogeneousVector (list t1a t1b)) (make-HeterogeneousVector (list t1b t1a))]
+   [FAIL (make-Immutable-HeterogeneousVector (list t1a t1b)) (make-Mutable-HeterogeneousVector (list t1b t1a))]
+   [(make-Mutable-HeterogeneousVector (list t1a t1b)) (make-Mutable-HeterogeneousVector (list t1b t1a))]
+   [(make-Mutable-HeterogeneousVector (list t1a t1b)) (make-HeterogeneousVector (list t1b t1a))]
+   [FAIL (make-Mutable-HeterogeneousVector (list t1a t1b)) (make-Immutable-HeterogeneousVector (list t1b t1a))]
    ))
 
 (define set-theoretic-type-tests

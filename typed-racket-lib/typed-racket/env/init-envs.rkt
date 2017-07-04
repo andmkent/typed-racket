@@ -114,10 +114,14 @@
      `(make-ListDots ,(type->sexp type) (quote ,dbound))]
     [(MPair: left right)
      `(make-MPair ,(type->sexp left) ,(type->sexp right))]
-    [(Vector: ty)
-     `(make-Vector ,(type->sexp ty))]
-    [(HeterogeneousVector: elems)
-     `(-vec* ,@(map type->sexp elems))]
+    [(Immutable-Vector: ty)
+     `(make-Immutable-Vector ,(type->sexp ty))]
+    [(Mutable-Vector: ty)
+     `(make-Mutable-Vector ,(type->sexp ty))]
+    [(Immutable-HeterogeneousVector: elems)
+     `(-Immutable-vec* ,@(map type->sexp elems))]
+    [(Mutable-HeterogeneousVector: elems)
+     `(-Mutable-vec* ,@(map type->sexp elems))]
     [(Box: ty)
      `(make-Box ,(type->sexp ty))]
     [(Channel: ty)

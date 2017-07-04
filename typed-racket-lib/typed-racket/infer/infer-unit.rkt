@@ -630,15 +630,22 @@
         [((List: ts) (Sequence: (list t*)))
          (% cset-meet* (for/list/fail ([t (in-list ts)])
                                       (cg t t*)))]
-        [((HeterogeneousVector: ts) (HeterogeneousVector: ts*))
+        [((Immutable-HeterogeneousVector: ts) (Immutable-HeterogeneousVector: ts*))
+         (cgen/list context ts ts*)]
+        [((Mutable-HeterogeneousVector: ts) (Mutable-HeterogeneousVector: ts*))
          (% cset-meet (cgen/list context ts ts*) (cgen/list context ts* ts))]
-        [((HeterogeneousVector: ts) (Vector: s))
+        [((Immutable-HeterogeneousVector: ts) (Immutable-Vector: s))
+         (define ts* (map (λ _ s) ts)) ;; invariant, everything has to match
+         (cgen/list context ts ts*)]
+        [((Mutable-HeterogeneousVector: ts) (Mutable-Vector: s))
          (define ts* (map (λ _ s) ts)) ;; invariant, everything has to match
          (% cset-meet (cgen/list context ts ts*) (cgen/list context ts* ts))]
-        [((HeterogeneousVector: ts) (Sequence: (list t*)))
+        [((HeterogeneousVector: ts)
+          (Sequence: (list t*)))
          (% cset-meet* (for/list/fail ([t (in-list ts)])
                                       (cg t t*)))]
-        [((Vector: t) (Sequence: (list t*)))
+        [((Vector: t)
+          (Sequence: (list t*)))
          (cg t t*)]
         [((? Base:String?) (Sequence: (list t*)))
          (cg -Char t*)]
@@ -693,9 +700,12 @@
         [((StructType: s) (StructType: t))
          (cg/inv s t)]
 
-        ;; vectors are invariant - generate constraints *both* ways
-        [((Vector: e) (Vector: e*))
+        ;; mutable vectors are invariant - generate constraints *both* ways
+        [((Mutable-Vector: e) (Mutable-Vector: e*))
          (cg/inv e e*)]
+        ;; immutable vectors are covariant
+        [((Immutable-Vector: e) (Immutable-Vector: e*))
+         (cg e e*)]
         ;; boxes are invariant - generate constraints *both* ways
         [((Box: e) (Box: e*))
          (cg/inv e e*)]
@@ -738,7 +748,7 @@
         [((? Base:Will-Executor?) (Evt: t))
          (cg S t)]
         [((? Base:Log-Receiver?) (Evt: t ))
-         (cg (make-HeterogeneousVector
+         (cg (make-Immutable-HeterogeneousVector
               (list -Symbol -String Univ
                     (Un (-val #f) -Symbol)))
              t)]

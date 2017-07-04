@@ -117,18 +117,19 @@
      (define vec-ty
        (match (and expected (resolve (intersect expected -VectorTop)))
          [(Is-a: (Vector: t))
-          (make-Vector
+          (make-Immutable-Vector
            (check-below
             (apply Un (for/list ([l (in-vector vec-val)])
                         (tc-literal l t)))
             t))]
          [(Is-a: (HeterogeneousVector: ts))
-          (make-HeterogeneousVector
+          (make-Immutable-HeterogeneousVector
            (for/list ([l (in-vector (syntax-e #'i))]
                       [t (in-list/rest ts #f)])
              (cond-check-below (tc-literal l t) t)))]
-         [_ (make-HeterogeneousVector (for/list ([l (in-vector (syntax-e #'i))])
-                                        (generalize (tc-literal l #f))))]))
+         [_ (make-Immutable-HeterogeneousVector
+             (for/list ([l (in-vector (syntax-e #'i))])
+               (generalize (tc-literal l #f))))]))
      (if (with-linear-integer-arithmetic?)
          (-refine/fresh v vec-ty (-eq (-lexp (vector-length vec-val))
                                       (-vec-len-of (-id-path v))))

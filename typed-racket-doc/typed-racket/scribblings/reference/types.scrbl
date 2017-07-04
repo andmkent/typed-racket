@@ -363,12 +363,26 @@ corresponding to @racket[trest], where @racket[bound]
 @ex[(lambda: ([x : Any]) (if (box? x) x (error "not a box!")))]
 }
 
-@defform[(Vectorof t)]{Homogenous @rtech{vectors} of @racket[t]}
+@defform[(Vectorof t)]{Homogenous @rtech{vectors} of @racket[t]
+ (mutable or immutable).}
+@defform[(Immutable-Vectorof t)]{Homogenous immutable @rtech{vectors} of @racket[t].}
+@defform[(Mutable-Vectorof t)]{Homogenous mutable @rtech{vectors} of @racket[t].}
+
 @defform[(Vector t ...)]{is the type of the vector with one element, in order,
   for each type provided to the @racket[Vector] type constructor.
+  A @racket[(Vector t)] may be mutable or immutable.
 
-  @ex[(vector 1 2 3)
-  #(a b c)]}
+  @ex[(ann (vector 1 'A) (Vector Fixnum 'A))]}
+
+@defform[(Immutable-Vector t ...)]{similar to @racket[(Vector t ...)], but
+ for immutable vectors.
+
+ @ex[(vector-immutable 1 2 3)]}
+
+@defform[(Mutable-Vector t ...)]{similar to @racket[(Vector t ...)], but
+ for mutable vectors.
+
+ @ex[(vector 1 2 3)]}
 
 @defidform[FlVector]{An @rtech{flvector}.
   @ex[(flvector 1.0 2.0 3.0)]}
@@ -387,7 +401,15 @@ corresponding to @racket[trest], where @racket[bound]
   via the combination of occurrence typing and @racket[vector?].
 @ex[(lambda: ([x : Any]) (if (vector? x) x (error "not a vector!")))]
 }
+@defidform[Mutable-VectorTop]{is the type of a mutable @rtech{vector}
+ with unknown length and element types.}
 
+
+@defform[(HashTable k v)]{is the type of a mutable or immutable @rtech{hash table}
+   with key type @racket[k] and value type @racket[v].
+
+@ex[(make-hash '((a . 1) (b . 2)))]
+}
 
 @defform[(Immutable-HashTable k v)]{is the type of an immutable @rtech{hash table}
    with key type @racket[k] and value type @racket[v].
@@ -407,11 +429,6 @@ corresponding to @racket[trest], where @racket[bound]
 @ex[(make-weak-hash '((a . 1) (b . 2)))]
 }
 
-@defform[(HashTable k v)]{is the type of a mutable or immutable @rtech{hash table}
-   with key type @racket[k] and value type @racket[v].
-
-@ex[(make-hash '((a . 1) (b . 2)))]
-}
 
 @defidform[HashTableTop]{is the type of a @rtech{hash table} with unknown key
   and value types and is the supertype of all hash table types. Only read-only

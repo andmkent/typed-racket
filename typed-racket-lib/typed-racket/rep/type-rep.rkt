@@ -31,6 +31,8 @@
                                    "base-union.rkt")
                      Type Prop Object PathElem SomeValues)
          Type?
+         Vector:
+         HeterogeneousVector:
          Mu-name:
          Poly-names: Poly-fresh:
          PolyDots-names:
@@ -226,12 +228,22 @@
 ;; Vectors
 ;;----------
 
-(def-type VectorTop () [#:mask mask:vector]
-  [#:singleton -VectorTop])
+(def-structural Immutable-Vector ([elem #:covariant])
+  [#:mask mask:immutable-vector])
 
-;; elem is a Type
-(def-structural Vector ([elem #:invariant])
-  [#:mask mask:vector])
+(def-type Mutable-VectorTop ()
+  [#:mask mask:mutable-vector]
+  [#:singleton -Mutable-VectorTop])
+
+(def-structural Mutable-Vector ([elem #:invariant])
+  [#:mask mask:mutable-vector])
+
+(define-match-expander Vector:
+  (lambda (stx)
+    (syntax-parse stx
+     [(_ elem-pats)
+      #'(or (Immutable-Vector: elem-pats)
+            (Mutable-Vector: elem-pats))])))
 
 ;;------
 ;; Box
@@ -421,11 +433,24 @@
 
 
 ;; elems are all Types
-(def-type HeterogeneousVector ([elems (listof Type?)])
-  [#:frees (f) (make-invariant (combine-frees (map f elems)))]
-  [#:fmap (f) (make-HeterogeneousVector (map f elems))]
+(def-type Immutable-HeterogeneousVector ([elems (listof Type?)])
+  [#:frees (f) (make-covariant (combine-frees (map f elems)))]
+  [#:fmap (f) (make-Immutable-HeterogeneousVector (map f elems))]
   [#:for-each (f) (for-each f elems)]
-  [#:mask mask:vector])
+  [#:mask mask:immutable-vector])
+
+(def-type Mutable-HeterogeneousVector ([elems (listof Type?)])
+  [#:frees (f) (make-invariant (combine-frees (map f elems)))]
+  [#:fmap (f) (make-Mutable-HeterogeneousVector (map f elems))]
+  [#:for-each (f) (for-each f elems)]
+  [#:mask mask:mutable-vector])
+
+(define-match-expander HeterogeneousVector:
+  (lambda (stx)
+    (syntax-parse stx
+     [(_ elem-pats)
+      #'(or (Immutable-HeterogeneousVector: elem-pats)
+            (Mutable-HeterogeneousVector: elem-pats))])))
 
 
 ;;************************************************************
