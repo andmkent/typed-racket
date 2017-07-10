@@ -389,7 +389,7 @@
        [_ (-pair (find-stx-type car) (find-stx-type cdr))])]
     [(and (vector xs ...) v)
      (cond
-      [#true ;(immutable? v)
+      [(immutable? v)
        (match (and expected (resolve (intersect expected (-ivec Univ))))
         [(Immutable-Vector: t)
          (make-Immutable-Vector
