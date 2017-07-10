@@ -807,7 +807,7 @@ the typed racket language.
          (define vs
            (call/ec
             (ann (λ (break)
-                   (define vs (ann (vector) T))
+                   (define: vs : T (vector))
                    (define i 0)
                    (for (clauses ...)
                      (define v body-expr)

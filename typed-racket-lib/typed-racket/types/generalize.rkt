@@ -34,7 +34,7 @@
         [(Immutable-HeterogeneousVector: ts) (apply -vec* ts)]
         [(Mutable-HeterogeneousVector: ts) (apply -vec* ts)]
         [(Immutable-Vector: t) (-vec t)]
-        ;[(Mutable-Vector: t) (-vec t)]
+        [(Mutable-Vector: t) (-vec t)]
         [(Immutable-HashTable: k v) (-HT k v)]
         [(Mutable-HashTable: k v) (-HT k v)]
         [(Weak-HashTable: k v) (-HT k v)]
