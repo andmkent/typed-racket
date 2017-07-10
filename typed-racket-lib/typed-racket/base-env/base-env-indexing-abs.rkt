@@ -221,7 +221,7 @@
                                         (-VectorTop index-type . -> . Univ)))]
    [unsafe-vector*-ref (-poly (a) (cl->* ((-vec a) index-type . -> . a)
                                          (-VectorTop index-type . -> . Univ)))]
-   [build-vector (-poly (a) (index-type (-Index . -> . a) . -> . (-Mutable-vec a)))]
+   [build-vector (-poly (a) (index-type (-Index . -> . a) . -> . (-mvec a)))]
    [vector-set! (-poly (a) (-> (-vec a) index-type a -Void))]
    [unsafe-vector-set! (-poly (a) (-> (-vec a) index-type a -Void))]
    [unsafe-vector*-set! (-poly (a) (-> (-vec a) index-type a -Void))]
@@ -230,8 +230,8 @@
            (cl->* ((-vec a) -Integer (-vec a) . -> . -Void)
                   ((-vec a) -Integer (-vec a) -Integer . -> . -Void)
                   ((-vec a) -Integer (-vec a) -Integer -Integer . -> . -Void)))]
-   [make-vector (-poly (a) (cl-> [(index-type) (-Mutable-vec (Un -Zero a))]
-                                 [(index-type a) (-Mutable-vec a)]))]
+   [make-vector (-poly (a) (cl-> [(index-type) (-mvec (Un -Zero a))]
+                                 [(index-type a) (-mvec a)]))]
 
    ;; flvector ops
 

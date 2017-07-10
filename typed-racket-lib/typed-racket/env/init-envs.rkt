@@ -115,13 +115,13 @@
     [(MPair: left right)
      `(make-MPair ,(type->sexp left) ,(type->sexp right))]
     [(Immutable-Vector: ty)
-     `(make-Immutable-Vector ,(type->sexp ty))]
+     `(-ivec ,(type->sexp ty))]
     [(Mutable-Vector: ty)
-     `(make-Mutable-Vector ,(type->sexp ty))]
+     `(-mvec ,(type->sexp ty))]
     [(Immutable-HeterogeneousVector: elems)
-     `(-Immutable-vec* ,@(map type->sexp elems))]
+     `(-ivec* ,@(map type->sexp elems))]
     [(Mutable-HeterogeneousVector: elems)
-     `(-Mutable-vec* ,@(map type->sexp elems))]
+     `(-mvec* ,@(map type->sexp elems))]
     [(Box: ty)
      `(make-Box ,(type->sexp ty))]
     [(Channel: ty)

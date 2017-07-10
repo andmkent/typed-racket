@@ -390,7 +390,7 @@
     [(and (vector xs ...) v)
      (cond
       [#true ;(immutable? v)
-       (match (and expected (resolve (intersect expected (-Immutable-vec Univ))))
+       (match (and expected (resolve (intersect expected (-ivec Univ))))
         [(Immutable-Vector: t)
          (make-Immutable-Vector
           (check-below
