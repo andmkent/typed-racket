@@ -434,7 +434,7 @@
 
 ;; elems are all Types
 (def-type Immutable-HeterogeneousVector ([elems (listof Type?)])
-  [#:frees (f) (make-covariant (combine-frees (map f elems)))]
+  [#:frees (f) (combine-frees (map f elems))]
   [#:fmap (f) (make-Immutable-HeterogeneousVector (map f elems))]
   [#:for-each (f) (for-each f elems)]
   [#:mask mask:immutable-vector])
