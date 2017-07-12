@@ -38,8 +38,6 @@
 (define -ivec make-Immutable-Vector)
 (define (make-Vector a) (Un (-mvec a) (-ivec a)))
 (define -vec make-Vector)
-(define (make-HeterogeneousVector ts) (Un (make-Immutable-HeterogeneousVector ts)
-                                          (make-Mutable-HeterogeneousVector ts)))
 (define (-ivec* . ts) (make-Immutable-HeterogeneousVector ts))
 (define (-mvec* . ts) (make-Mutable-HeterogeneousVector ts))
 (define (-vec* . ts) (make-HeterogeneousVector ts))
