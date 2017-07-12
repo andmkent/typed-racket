@@ -32,6 +32,7 @@
                      Type Prop Object PathElem SomeValues)
          Type?
          Vector:
+         make-HeterogeneousVector
          HeterogeneousVector:
          Mu-name:
          Poly-names: Poly-fresh:
@@ -431,7 +432,6 @@
   [#:for-each (f) (f dty)])
 
 
-
 ;; elems are all Types
 (def-type Immutable-HeterogeneousVector ([elems (listof Type?)])
   [#:frees (f) (combine-frees (map f elems))]
@@ -444,6 +444,10 @@
   [#:fmap (f) (make-Mutable-HeterogeneousVector (map f elems))]
   [#:for-each (f) (for-each f elems)]
   [#:mask mask:mutable-vector])
+
+(define (make-HeterogeneousVector ts)
+  (Un (make-Immutable-HeterogeneousVector ts)
+      (make-Mutable-HeterogeneousVector ts)))
 
 (define-match-expander HeterogeneousVector:
   (lambda (stx)

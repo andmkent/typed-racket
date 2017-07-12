@@ -38,6 +38,7 @@
           -ThreadCellTop
           make-Ephemeron
           make-CustodianBox
+          make-HeterogeneousVector
           make-Continuation-Mark-Keyof
           -Continuation-Mark-KeyTop
           make-Prompt-Tagof
