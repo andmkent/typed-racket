@@ -244,7 +244,20 @@
     (syntax-parse stx
      [(_ elem-pats)
       #'(or (Immutable-Vector: elem-pats)
-            (Mutable-Vector: elem-pats))])))
+            (Mutable-Vector: elem-pats)
+            (app VectorUnion? (and (? values) elem-pats)))])))
+
+(define (VectorUnion? t)
+  (match t
+    [(Union: _
+             (? Bottom?)
+             (or (list (Immutable-Vector: ts)
+                       (Mutable-Vector: ts))
+                 (list (Mutable-Vector: ts)
+                       (Immutable-Vector: ts)))
+             _)
+     ts]
+    [_ #f]))
 
 ;;------
 ;; Box
@@ -452,9 +465,22 @@
 (define-match-expander HeterogeneousVector:
   (lambda (stx)
     (syntax-parse stx
-     [(_ elem-pats)
-      #'(or (Immutable-HeterogeneousVector: elem-pats)
-            (Mutable-HeterogeneousVector: elem-pats))])))
+      [(_ elem-pats)
+       #'(or (Immutable-HeterogeneousVector: elem-pats)
+             (Mutable-HeterogeneousVector: elem-pats)
+             (app HeterogeneousVectorUnion? (and (? values) elem-pats)))])))
+
+(define (HeterogeneousVectorUnion? t)
+  (match t
+    [(Union: _
+             (? Bottom?)
+             (or (list (Immutable-HeterogeneousVector: ts)
+                       (Mutable-HeterogeneousVector: ts))
+                 (list (Mutable-HeterogeneousVector: ts)
+                       (Immutable-HeterogeneousVector: ts)))
+             _)
+     ts]
+    [_ #f]))
 
 
 ;;************************************************************
