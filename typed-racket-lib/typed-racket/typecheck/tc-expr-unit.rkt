@@ -448,7 +448,7 @@
         [(Mutable-HashTable: k v)
          (value->HT/find-stx-type h -Mutable-HT k v)]
         [_
-         (value->HT/find-stx-type h -HT)])])] ;; TODO should be mutable
+         (value->HT/find-stx-type h -Mutable-HT)])])]
     [(? prefab-struct-key)
      ;; FIXME is there a type for prefab structs?
      Univ]
