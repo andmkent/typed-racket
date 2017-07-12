@@ -1042,7 +1042,7 @@
         [tc-e/t #'3 (-Syntax -PosByte)]
         [tc-e/t #'(2 3 4) (-Syntax (-lst* (-Syntax -PosByte) (-Syntax -PosByte) (-Syntax -PosByte)))]
         [tc-e/t #'id (-Syntax (-val 'id))]
-        [tc-e/t #'#(1 2 3) (-Syntax (make-Mutable-HeterogeneousVector (list (-Syntax -One) (-Syntax -PosByte) (-Syntax -PosByte))))]
+        [tc-e/t #'#(1 2 3) (-Syntax (-mvec* (-Syntax -One) (-Syntax -PosByte) (-Syntax -PosByte)))]
         [tc-e/t (ann #'#(1 2 3) (Syntaxof (Mutable-Vectorof (Syntaxof (U 1 2 3 'foo)))))
                 (-Syntax (-mvec (-Syntax (t:Un (-val 1) (-val 2) (-val 3) (-val 'foo)))))]
         [tc-e/t (ann #'#(1 2 3) (Syntaxof (Mutable-Vector (Syntaxof (U 1 'foo))

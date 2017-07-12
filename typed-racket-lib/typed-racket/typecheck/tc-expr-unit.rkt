@@ -389,7 +389,7 @@
        [_ (-pair (find-stx-type car) (find-stx-type cdr))])]
     [(and (vector xs ...) v)
      (cond
-      [(immutable? v)
+      [(immutable? v) ;; Note: probably unreachable, because `(immutable? (syntax-e #'#(1)))` is false
        (match (and expected (resolve (intersect expected (-ivec Univ))))
         [(Immutable-Vector: t)
          (make-Immutable-Vector
