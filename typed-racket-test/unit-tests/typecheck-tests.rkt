@@ -1042,15 +1042,15 @@
         [tc-e/t #'3 (-Syntax -PosByte)]
         [tc-e/t #'(2 3 4) (-Syntax (-lst* (-Syntax -PosByte) (-Syntax -PosByte) (-Syntax -PosByte)))]
         [tc-e/t #'id (-Syntax (-val 'id))]
-        [tc-e/t #'#(1 2 3) (-Syntax (make-Immutable-HeterogeneousVector (list (-Syntax -One) (-Syntax -PosByte) (-Syntax -PosByte))))]
-        [tc-e/t (ann #'#(1 2 3) (Syntaxof (Immutable-Vectorof (Syntaxof (U 1 2 3 'foo)))))
-                (-Syntax (-ivec (-Syntax (t:Un (-val 1) (-val 2) (-val 3) (-val 'foo)))))]
-        [tc-e/t (ann #'#(1 2 3) (Syntaxof (Immutable-Vector (Syntaxof (U 1 'foo))
-                                                            (Syntaxof (U 2 'bar))
-                                                            (Syntaxof (U 3 'baz)))))
-                (-Syntax (make-Immutable-HeterogeneousVector (list (-Syntax (t:Un (-val 1) (-val 'foo)))
-                                                                   (-Syntax (t:Un (-val 2) (-val 'bar)))
-                                                                   (-Syntax (t:Un (-val 3) (-val 'baz))))))]
+        [tc-e/t #'#(1 2 3) (-Syntax (make-Mutable-HeterogeneousVector (list (-Syntax -One) (-Syntax -PosByte) (-Syntax -PosByte))))]
+        [tc-e/t (ann #'#(1 2 3) (Syntaxof (Mutable-Vectorof (Syntaxof (U 1 2 3 'foo)))))
+                (-Syntax (-mvec (-Syntax (t:Un (-val 1) (-val 2) (-val 3) (-val 'foo)))))]
+        [tc-e/t (ann #'#(1 2 3) (Syntaxof (Mutable-Vector (Syntaxof (U 1 'foo))
+                                                          (Syntaxof (U 2 'bar))
+                                                          (Syntaxof (U 3 'baz)))))
+                (-Syntax (make-Mutable-HeterogeneousVector (list (-Syntax (t:Un (-val 1) (-val 'foo)))
+                                                                 (-Syntax (t:Un (-val 2) (-val 'bar)))
+                                                                 (-Syntax (t:Un (-val 3) (-val 'baz))))))]
         [tc-e/t #'#&2 (-Syntax (-box (-Syntax -PosByte)))]
         [tc-e/t (ann #'#&2 (Syntaxof (Boxof (Syntaxof (U 2 'foo)))))
                 (-Syntax (-box (-Syntax (t:Un (-val 2) (-val 'foo)))))]
