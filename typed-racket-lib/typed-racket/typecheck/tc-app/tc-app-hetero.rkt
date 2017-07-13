@@ -184,7 +184,7 @@
                ;; of the union that are vectors.  If there's only one of those,
                ;; we re-run this whole algorithm with that.  Otherwise, we treat
                ;; it like any other expected type.
-               [(tc-result1: (app resolve (Union: _ ts))) (=> continue)
+               [(tc-result1: (app resolve (Is-a: (Union: _ ts)))) (=> continue)
                 (define u-ts (for/list ([t (in-list ts)]
                                         #:when (eq? maskV (mask t)))
                                t))

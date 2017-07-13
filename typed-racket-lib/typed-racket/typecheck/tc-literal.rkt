@@ -115,14 +115,14 @@
     [(~var i (3d vector?))
      (define vec-val (syntax-e #'i))
      (define vec-ty
-       (match (and expected (resolve (intersect expected -VectorTop)))
-         [(Is-a: (Vector: t))
+       (match (and expected (resolve (intersect expected (-ivec Univ))))
+         [(Is-a: (Immutable-Vector: t))
           (make-Immutable-Vector
            (check-below
             (apply Un (for/list ([l (in-vector vec-val)])
                         (tc-literal l t)))
             t))]
-         [(Is-a: (HeterogeneousVector: ts))
+         [(Is-a: (Immutable-HeterogeneousVector: ts))
           (make-Immutable-HeterogeneousVector
            (for/list ([l (in-vector (syntax-e #'i))]
                       [t (in-list/rest ts #f)])
