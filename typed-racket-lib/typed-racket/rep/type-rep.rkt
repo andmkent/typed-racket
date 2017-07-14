@@ -242,9 +242,16 @@
 (define-match-expander Vector:
   (lambda (stx)
     (syntax-parse stx
-     [(_ elem-pats)
-      #'(or (Immutable-Vector: elem-pats)
-            (Mutable-Vector: elem-pats))])))
+     [(_ elem-pat)
+      #'(or (Immutable-Vector: elem-pat)
+            (Mutable-Vector: elem-pat)
+            ;; Cannot use `list-no-order`
+            ;; - http://bugs.racket-lang.org/query/?cmd=view&pr=10083
+            ;; - https://github.com/racket/racket/issues/1304
+            (Union-all: (list (Immutable-Vector: elem-pat)
+                              (Mutable-Vector: elem-pat)))
+            (Union-all: (list (Mutable-Vector: elem-pat)
+                              (Immutable-Vector: elem-pat))))])))
 
 ;;------
 ;; Box
@@ -454,7 +461,14 @@
     (syntax-parse stx
      [(_ elem-pats)
       #'(or (Immutable-HeterogeneousVector: elem-pats)
-            (Mutable-HeterogeneousVector: elem-pats))])))
+            (Mutable-HeterogeneousVector: elem-pats)
+            ;; Cannot use `list-no-order`
+            ;; - http://bugs.racket-lang.org/query/?cmd=view&pr=10083
+            ;; - https://github.com/racket/racket/issues/1304
+            (Union-all: (list (Immutable-HeterogeneousVector: elem-pats)
+                              (Mutable-HeterogeneousVector: elem-pats)))
+            (Union-all: (list (Mutable-HeterogeneousVector: elem-pats)
+                              (Immutable-HeterogeneousVector: elem-pats))))])))
 
 
 ;;************************************************************
