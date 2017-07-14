@@ -3,4 +3,4 @@
 ;; Test that VectorTop generates a flat contract
 
 (define v : VectorTop (vector))
-(cast v VectorTop)
+(void (cast v VectorTop))
