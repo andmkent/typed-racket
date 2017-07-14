@@ -1,5 +1,5 @@
 #;
-(exn-pred 2)
+(exn-pred #rx"given: One")
 #lang typed/racket
 
-(ann (vector (ann 1 Symbol)) (Vector Number Symbol))
+(ann (vector 1) (Vector Number Symbol))
