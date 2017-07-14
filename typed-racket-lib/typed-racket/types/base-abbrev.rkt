@@ -101,14 +101,6 @@
                                -Mutable-HashTableTop
                                -Weak-HashTableTop))
 
-(define-match-expander HashTableTop:
-  (lambda (stx)
-    (syntax-parse stx
-     [(_)
-      #'(or (Immutable-HashTable: _ _)
-            (Mutable-HashTableTop:)
-            (Weak-HashTableTop:))])))
-
 (define/decl -VectorTop (Un (make-Immutable-Vector Univ)
                             -Mutable-VectorTop))
 

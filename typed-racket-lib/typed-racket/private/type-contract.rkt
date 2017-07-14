@@ -510,6 +510,7 @@
            ;; - `HashTableTop` would make a chaperone contract
            ;; - because `HashTableTop` is a union containing `(Immutable-HashTable Any Any)`
            ;; - and `Any` makes a chaperone contract
+           ;; TODO need a similar case for VectorTop? Test pkgs
            hash?/sc]
           [(Union-all: elems)
           ;; TODO far too much code duplication,
