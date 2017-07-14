@@ -2,10 +2,11 @@
 
 (require "../utils/utils.rkt"
          racket/match
+         racket/list
          (typecheck signatures check-below)
          (types abbrev numeric-tower resolve subtype generalize
-                prefab)
-         (rep type-rep)
+                prefab tc-result)
+         (rep type-rep type-mask rep-utils)
          (only-in (infer infer) intersect)
          (utils stxclass-util)
          syntax/parse
@@ -127,6 +128,10 @@
            (for/list ([l (in-vector (syntax-e #'i))]
                       [t (in-list/rest ts #f)])
              (cond-check-below (tc-literal l t) t)))]
+         [(tc-result1: (app resolve (Is-a: (Union: _ ts))))
+          #:when (= 1 (count (λ (t) (eq? mask:immutable-vector (mask t))) ts))
+          (match (memf (λ (t) (eq? mask:immutable-vector (mask t))) ts)
+            [(cons t0 _) (tc-literal v-stx (ret t0))])]
          [_ (make-Immutable-HeterogeneousVector
              (for/list ([l (in-vector (syntax-e #'i))])
                (generalize (tc-literal l #f))))]))

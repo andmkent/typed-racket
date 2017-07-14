@@ -1,6 +1,7 @@
 #lang racket/unit
 
 (require "../../utils/utils.rkt"
+         racket/list
          syntax/parse syntax/stx racket/match racket/sequence
          (for-syntax racket/base syntax/parse racket/syntax)
          "signatures.rkt"
@@ -164,42 +165,39 @@
         (syntax/loc stx
           (lambda (form expected)
             (syntax-parse form #:literal-sets (hetero-literals)
-             [((~or vector-immutable vector) . args)
-              (match expected
-               [(tc-result1: (app resolve (Is-a: (?match-V t))))
-                (ret (?make-HV
-                       (for/list ([e (in-syntax #'args)])
-                         (tc-expr/check e (ret t))
-                         t)))]
-               [(tc-result1: (app resolve (Is-a: (?match-HV ts))))
-                (cond
-                 [(= (length ts) (syntax-length #'args))
-                  (ret
-                   (?make-HV
-                     (for/list ([e (in-syntax #'args)]
-                                [t (in-list ts)])
-                       (tc-expr/check/t e (ret t))))
-                   -true-propset)]
-                 [else
-                  (tc-error/expr
-                    "expected vector with ~a elements, but got ~a"
-                    (length ts) (?make-HV (stx-map tc-expr/t #'args)))])]
-               ;; If the expected type is a union, then we examine just the parts
-               ;; of the union that are vectors.  If there's only one of those,
-               ;; we re-run this whole algorithm with that.  Otherwise, we treat
-               ;; it like any other expected type.
-               [(tc-result1: (app resolve (Is-a: (Union: _ ts)))) (=> continue)
-                (define u-ts (for/list ([t (in-list ts)]
-                                        #:when (eq? ?maskV (mask t)))
-                               t))
-                (match u-ts
-                  [(list t0) (tc/app #`(#%plain-app . #,form) (ret t0))]
-                  [_ (continue)])]
-               ;; if mutable, generalize element types
-               [(or #f (tc-any-results: _) (tc-result1: _))
-                (define tc-hv-elem ?tc-expr/t/maybe-generalize)
-                (ret (?make-HV
-                       (for/list ((e (in-syntax #'args)))
-                         (tc-hv-elem e))))]
-               [_ (ret Err)])])))]))
+              [((~or vector-immutable vector) . args)
+               (match expected
+                 [(tc-result1: (app resolve (Is-a: (?match-V t))))
+                  (ret (?make-HV
+                        (for/list ([e (in-syntax #'args)])
+                          (tc-expr/check e (ret t))
+                          t)))]
+                 [(tc-result1: (app resolve (Is-a: (?match-HV ts))))
+                  (cond
+                    [(= (length ts) (syntax-length #'args))
+                     (ret
+                      (?make-HV
+                       (for/list ([e (in-syntax #'args)]
+                                  [t (in-list ts)])
+                         (tc-expr/check/t e (ret t))))
+                      -true-propset)]
+                    [else
+                     (tc-error/expr
+                      "expected vector with ~a elements, but got ~a"
+                      (length ts) (?make-HV (stx-map tc-expr/t #'args)))])]
+                 ;; If the expected type is a union, then we examine just the parts
+                 ;; of the union that are vectors.  If there's only one of those,
+                 ;; we re-run this whole algorithm with that.  Otherwise, we treat
+                 ;; it like any other expected type.
+                 [(tc-result1: (app resolve (Is-a: (Union: _ ts))))
+                  #:when (= 1 (count (λ (t) (eq? ?maskV (mask t))) ts))
+                  (match (memf (λ (t) (eq? ?maskV (mask t))) ts)
+                    [(cons t0 _) (tc/app #`(#%plain-app . #,form) (ret t0))])]
+                 ;; if mutable, generalize element types
+                 [(or #f (tc-any-results: _) (tc-result1: _))
+                  (define tc-hv-elem ?tc-expr/t/maybe-generalize)
+                  (ret (?make-HV
+                        (for/list ((e (in-syntax #'args)))
+                          (tc-hv-elem e))))]
+                 [_ (ret Err)])])))]))
   (values (make-tc-app-hetero-vector 'immutable) (make-tc-app-hetero-vector 'mutable))))
