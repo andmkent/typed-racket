@@ -115,7 +115,7 @@
     [(~var i (3d vector?))
      (define vec-val (syntax-e #'i))
      (define vec-ty
-       (match (and expected (resolve (intersect expected (-ivec Univ))))
+       (match (and expected (resolve expected))
          [(Is-a: (Immutable-Vector: t))
           (make-Immutable-Vector
            (check-below
