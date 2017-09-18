@@ -12,6 +12,7 @@
          "core-rep.rkt"
          "free-variance.rkt"
          (env mvar-env)
+         (for-syntax racket/base)
          (contract-req))
 
 (provide -id-path
@@ -34,6 +35,7 @@
          make-obj-seq
          obj-seq-next
          scale-obj
+         uninterpreted-PE?
          (rename-out [make-LExp* make-LExp]
                      [make-LExp raw-make-LExp])
          (all-from-out "fme-utils.rkt"))
@@ -43,12 +45,16 @@
 (def-path-elem SyntaxPE () [#:singleton -syntax-e])
 (def-path-elem ForcePE () [#:singleton -force])
 (def-path-elem FieldPE () [#:singleton -field])
-(def-path-elem VecLenPE () [#:singleton -vec-len])
 (def-path-elem StructPE ([t Type?] [idx natural-number/c])
   [#:frees (f) (f t)]
   [#:fmap (f) (make-StructPE (f t) idx)]
   [#:for-each (f) (f t)])
 
+(def-path-elem VecLenPE () [#:singleton -vec-len])
+
+; path elements which do not correspond to a field
+; within some type (currently just vector length PEs)
+(define-syntax uninterpreted-PE? (make-rename-transformer #'VecLenPE?))
 
 (define/match (-path-elem-of pe o)
   [(pe (Path: pes x)) (make-Path (cons pe pes) x)]
@@ -64,7 +70,10 @@
       o
       (-path-elem-of (make-StructPE t idx) o)))
 
-(def-object Path ([elems (listof PathElem?)] [name name-ref/c])
+
+;; e.g. (car (cdr x)) == (make-Path (list -car -cdr) x)
+(def-object Path ([elems (listof PathElem?)]
+                  [name name-ref/c])
   [#:frees (f)  (combine-frees (map f elems))]
   [#:fmap (f) (make-Path (map f elems) name)]
   [#:for-each (f) (for-each f elems)]

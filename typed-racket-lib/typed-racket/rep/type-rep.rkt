@@ -3,7 +3,8 @@
 ;; This module provides type representations and utility functions
 ;; and pattern matchers on types
 
-(require "../utils/utils.rkt")
+(require "../utils/utils.rkt"
+         (for-syntax "../utils/utils.rkt"))
 
 ;; TODO use contract-req
 (require (utils tc-utils)
@@ -59,12 +60,13 @@
          Refine-obj:
          Refine-name:
          save-term-var-names!
-         extract-props
          instantiate-type
          abstract-type
          instantiate-obj
          abstract-obj
          substitute-names
+         DFun/ids:
+         DFun/pretty-ids:
          (rename-out [Union:* Union:]
                      [Intersection:* Intersection:]
                      [make-Intersection* make-Intersection]
@@ -84,8 +86,7 @@
                      [Poly-body* Poly-body]
                      [PolyDots-body* PolyDots-body]
                      [PolyRow-body* PolyRow-body]
-                     [Intersection-prop* Intersection-prop]
-                     [Intersection:* Intersection:]))
+                     [Intersection-prop* Intersection-prop]))
 
 (define (resolvable? x)
   (or (Mu? x)
@@ -558,6 +559,37 @@
   [#:for-each (f) (for-each f arrows)])
 
 
+;; a function with dependent arguments
+(def-type DFun ([dom (listof Type?)]
+                [rng SomeValues?])
+  [#:mask mask:procedure]
+  [#:frees (f) (combine-frees (cons (f rng)
+                                    (for/list ([d (in-list dom)])
+                                      (flip-variances (f d)))))]
+  [#:fmap (f) (make-DFun (map f dom) (f rng))]
+  [#:for-each (f) (for-each f dom) (f rng)])
+
+
+(define-for-syntax (DFun-id-matcher id-fun)
+  (λ (stx)
+    (syntax-case stx ()
+      [(_ ids dom rng)
+       (quasisyntax/loc stx
+         (app (match-lambda
+                [(DFun: raw-dom raw-rng)
+                 (define fresh-ids (for/list ([_ (in-list raw-dom)]) (#,id-fun)))
+                 (define (instantiate rep) (instantiate-obj rep fresh-ids))
+                 (list fresh-ids
+                       (map instantiate raw-dom)
+                       (instantiate raw-rng))]
+                [_ #f])
+              (list ids dom rng)))])))
+
+(define-match-expander DFun/ids:
+  (DFun-id-matcher #'genid))
+
+(define-match-expander DFun/pretty-ids:
+  (DFun-id-matcher #'gen-pretty-id))
 
 ;;************************************************************
 ;; Structs
@@ -962,36 +994,6 @@
   (and p (instantiate-obj p obj)))
 
 
-;; given the fact that 'obj' is of type 'type',
-;; look inside of type trying to learn
-;; more info about obj
-(define (extract-props obj type)
-  (cond
-    [(Empty? obj) '()]
-    [else
-     (define props '())
-     (let extract! ([rep type]
-                    [obj obj])
-       (match rep
-         [(== -Zero)
-          #:when (with-linear-integer-arithmetic?)
-          (set! props (cons (-eq obj (-lexp 0)) props))]
-         [(== -One)
-          #:when (with-linear-integer-arithmetic?)
-          (set! props (cons (-eq obj (-lexp 1)) props))]
-         [(Pair: t1 t2) (extract! t1 (-car-of obj))
-                        (extract! t2 (-cdr-of obj))]
-         [(Refine-obj: obj t prop)
-          (set! props (cons prop props))
-          (extract! t obj)]
-         [(HeterogeneousVector: ts)
-          #:when (with-linear-integer-arithmetic?)
-          (set! props (cons (-eq (-vec-len-of obj) (-lexp (length ts)))
-                            props))]
-         [(Intersection: ts _ _) (for ([t (in-list ts)])
-                                   (extract! t obj))]
-         [_ (void)]))
-     props]))
 
 ;; refinement based on some predicate function 'pred'
 (def-type Refinement ([parent Type?] [pred identifier?])
@@ -1311,18 +1313,29 @@
 ;; in 'initial', replacing them with term De Bruijn indices
 ;; '(0 . 0) ... '(0 . n-1) (or their appropriate
 ;; successors under additional binders)
-(define/cond-contract (abstract-obj initial ids-to-abstract)
-  (-> Rep? (or/c identifier? (listof identifier?)) Rep?)
+
+(define/cond-contract (abstract-obj initial
+                                    ids-to-abstract
+                                    [erase-existentials? #f])
+  (->* (Rep?
+        (or/c identifier? (listof identifier?)))
+       (boolean?)
+       Rep?)
   (cond
-    [(null? ids-to-abstract) initial]
-    [(not (pair? ids-to-abstract))
+    [(and (null? ids-to-abstract)
+          (not erase-existentials?)) initial]
+    [(identifier? ids-to-abstract)
      (abstract-obj initial (list ids-to-abstract))]
     [else
      (define (abstract-id id lvl)
        (cond
          [(identifier? id)
           (match (index-of ids-to-abstract id free-identifier=?)
-            [#f id]
+            [#f (cond
+                  [(and erase-existentials?
+                        (existential-id? id))
+                   -empty-obj]
+                  [else id])]
             ;; adjust index properly before using (see comments above
             ;; and note we are under 'lvl' additional binders)
             [idx (cons lvl idx)])]
@@ -1353,6 +1366,10 @@
                    (and rst (rec rst))
                    (map rec kws)
                    (rec/inc rng))]
+      [(DFun: dom rng)
+       (make-DFun (for/list ([d (in-list dom)])
+                    (rec/lvl d (add1 lvl)))
+                  (rec/inc rng))]
       ;; Refinement types e.g. {x ∈ τ | ψ(x)}
       ;; increment the level of the substituted object
       [(Intersection: ts p _) (-refine

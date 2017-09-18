@@ -13,11 +13,12 @@
 These features are currently experimental and subject to change.
 
 @defform[(declare-refinement id)]{Declares @racket[id] to be usable in
-refinement types.}
+@racket[Refinement] types.}
 
 @defform[(Refinement id)]{Includes values that have been tested with the
 predicate @racket[id], which must have been specified with
-@racket[declare-refinement].}
+@racket[declare-refinement]. These predicate-based refinements are distinct
+from Typed Racket's more general @racket[Refine] form.}
 
 @defform[(define-typed-struct/exec forms ...)]{Defines an executable structure.}
 
@@ -47,13 +48,12 @@ you want, so you shouldn't use @racket[make-predicate] with these types.
 
 
 
-@section{Refinements and Linear Integer Reasoning}
+@section{Logical Refinements and Linear Integer Reasoning}
 
-Refinement types have been added to Typed Racket's core, but
-Typed Racket does not yet have function types which allow
-dependencies between argument types, limiting how useful
-refinements are for now. Allowing argument dependencies
-is on our `to do' list.
+Typed Racket allows types to be `refined' or `constrained'
+by logical propositions. These propositions can mention
+certain program terms, allowing a program's types to depend
+on the values of terms.
 
 @defform[#:literals (Refine : Top Bot ! and or when
                             unless if < <= = > >= car cdr
@@ -73,7 +73,8 @@ is on our `to do' list.
           [linear-comp < <= = >= >]
           [symbolic-object exact-integer
            linear-term
-           (+ linear-term linear-term ...)]
+           (+ linear-term linear-term ...)
+           (- linear-term linear-term ...)]
           [linear-term symbolic-path
            (* exact-integer symbolic-path)]
           [symbolic-path id
@@ -113,24 +114,86 @@ depending on which of their subcomponents hold hold:
 
 @racket[(unless p q)] is equivalent to @racket[(or p q)].
 
-Typed Racket's linear integer reasoning is turned off by
-default. If you want to activate it, you must add the
-@racket[#:with-linear-integer-arithmetic] keyword when
+In addition to reasoning about propositions regarding types
+(i.e. something is or is not of some particular type), Typed
+Racket is equipped with a linear integer arithmetic solver
+that can prove linear constraints when necessary. To turn on
+this solver (and some other refinement reasoning), you must add
+the @racket[#:with-refinements] keyword when
 specifying the language of your program:
 
 
-@racketmod[typed/racket #:with-linear-integer-arithmetic]
+@racketmod[typed/racket #:with-refinements]
 
 
-With this language option on, code such as the following
-will type check:
+With this language option on, type checking the following arithmetic
+primitives will produce more specific logical info (when they are being
+applied to 2 or 3 arguments): @racket[*], @racket[+], @racket[-],
+@racket[<], @racket[<=], @racket[=], @racket[>=], and @racket[>].
+
+This allows code such as the following to type check:
 
 @racketblock[(if (< 5 4)
                  (+ "Luke," "I am your father")
                  "that's impossible!")]
 
-i.e. with linear integer reasoning enabled, Typed Racket
+i.e. with refinement reasoning enabled, Typed Racket
 detects that the comparison is guaranteed to produce
 @racket[#f], and thus the clearly ill-typed `then'-branch is
 ignored by the type checker since it is guaranteed to be
 dead code.
+
+
+@section{Dependent Function Types}
+
+Typed Racket supports explicitly dependent function types:
+  
+@defform*/subs[#:link-target? #f #:id -> #:literals (:)
+               [(-> ([id : opt-deps type opt-where] ...) type opt-props)]
+               ([opt-deps (code:line) (id ...)]
+                [opt-where (code:line) (code:line #:where prop)]
+                [opt-props (code:line)
+                 (code:line opt-pos-prop
+                            opt-neg-prop
+                            opt-obj)]
+                [opt-pos-prop (code:line)
+                 (code:line #:+ prop)]
+                [opt-neg-prop (code:line)
+                 (code:line #:- prop)]
+                [opt-obj (code:line)
+                 (code:line #:object obj)])]
+
+
+The syntax is partially borrowed from Racket's dependent
+contracts (i.e. @racket[->i]).
+
+Each function argument has a name, an optional list of
+identifiers it depends on, an argument type, and an optional
+@racket[#:where] clause that can refine the type. An
+argument's type can mention (i.e. depend on) other arguments
+by name if they appear in its list of dependencies.
+Dependencies cannot be cyclic.
+
+A function's range may mention on any of its arguments.
+
+The syntax for @racket[prop] and @racket[obj] is the same as
+the syntax for @racket[proposition] @racket[symbolic-object] in
+the description of @racket[Refine]'s syntax.
+
+For example, here is a stronger type for Racket's @racket[vector-ref]:
+
+@ex[#:label #f
+ (: safe-ref1 (All (A) (-> ([v : (Vectorof A)]
+                            [n : (v) Natural #:where (< n (vector-length v))])
+                           A)))
+ (define (safe-ref1 v n) (vector-ref v n))]
+
+Here is an equivalent type that uses an explicit @racket[Refine] instead of
+a @racket[#:where] clause (i.e. @racket[#:where] is just syntactic sugar
+for an explicit @racket[Refine]):
+
+@ex[#:label #f
+ (: safe-ref2 (All (A) (-> ([v : (Vectorof A)]
+                            [n : (v) (Refine [i : Natural] (< i (vector-length v)))])
+                           A)))
+ (define (safe-ref2 v n) (vector-ref v n))]

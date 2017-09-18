@@ -1,13 +1,15 @@
 #lang racket/base
 
 (require (rename-in "../utils/utils.rkt" [infer r:infer])
-         racket/match racket/list
+         racket/match racket/list racket/sequence
          (prefix-in c: (contract-req))
-         (env tvar-env)
+         (utils tc-utils)
+         (env tvar-env lexical-env)
          (for-syntax syntax/parse racket/base)
          (types utils subtype resolve abbrev
                 substitute classes prop-ops)
-         (typecheck tc-metafunctions tc-app-helper tc-subst)
+         (typecheck tc-metafunctions tc-app-helper tc-subst tc-envops
+                    check-below)
          (rep type-rep)
          (r:infer infer))
 
@@ -56,8 +58,35 @@
               #:when (not (Empty? o)))
      (list* idx o t))))
 
+;; helper function to check arguments for dependent functions are well typed
+;; (we can't reuse other pre-existing functions because their design is
+;;  tightly coupled to the case-> nature of Functions currently)
+(define (dfunapp-check! args-stx argress dom)
+  (unless (= (length dom) (length argress))
+    (tc-error/fields "could not apply function"
+                     #:more "wrong number of arguments provided"
+                     "expected" (length dom)
+                     "given" (length argress)
+                     #:delayed? #t))
+  (for ([a (in-syntax args-stx)]
+        [arg-res (in-list argress)]
+        [dom-t (in-list dom)])
+    (parameterize ([current-orig-stx a])
+      (check-below arg-res (ret dom-t)))))
+
 (define (tc/funapp f-stx args-stx f-type args-res expected)
   (match-define (list (tc-result1: argtys (PropSet: argps+ argps-) argobjs) ...) args-res)
+  (define arg-props
+    (for/fold ([ps (map -or argps+ argps-)])
+              ([ty (in-list argtys)]
+               [obj (in-list argobjs)]
+               #:when (match obj
+                        [(Path: _ (and (? identifier?)
+                                       (? existential-id?)))
+                         #t]
+                        [_ (with-refinements?)]))
+      (define-values (type extracted-props) (extract-props obj ty))
+      (cons (-is-type obj type) (append extracted-props ps))))
   (define result
     (match f-type
       ;; we special-case this (no case-lambda) for improved error messages
@@ -65,6 +94,21 @@
       [(Fun: (list arrow))
        #:when (not (RestDots? (Arrow-rst arrow)))
        (tc/funapp1 f-stx args-stx arrow args-res expected)]
+      [(DFun: raw-dom raw-rng)
+       (define subst (for/list ([o (in-list argobjs)]
+                                [t (in-list argtys)]
+                                [idx (in-naturals)])
+                       (list* idx o t)))
+       (define dom (for/list ([t (in-list raw-dom)])
+                     (instantiate-obj+simplify t subst)))
+       (define rng (values->tc-results/explicit-subst raw-rng subst))
+       (with-lexical-env+props-simple
+           arg-props
+         #:absurd (if expected
+                      (fix-results expected)
+                      (ret -Bottom))
+         (dfunapp-check! args-stx args-res dom)
+         rng)]
       [(Fun: arrows)
        ;; check there are no RestDots
        #:when (not (for/or ([a (in-list arrows)])
@@ -150,18 +194,44 @@
          ;; only try inference if the argument lengths are appropriate
          ;; and there's no mandatory kw
          #:infer-when
-         (and (not (ormap Keyword-required? kws)) ((if rst <= =) (length dom) (length argtys)))
+         (and (not (ormap Keyword-required? kws))
+              ((if rst <= =) (length dom) (length argtys)))
          ;; Only try to infer the free vars of the rng (which includes the vars
          ;; in props/objects).
          #:maybe-inferred-substitution
          (let ([rng (subst-dom-objs argtys argobjs rng)])
            (extend-tvars vars
                          (infer/vararg vars null argtys dom rst rng
-                                       (and expected (tc-results->values expected))
+                                       (and expected
+                                            (tc-results->values expected))
                                        #:objs argobjs)))
          #:function-type f-type
          #:args-results args-res
          #:expected expected)]
+      ;; polymorphic dependent function
+      [(Poly: vars (DFun: raw-dom raw-rng))
+       (define dom (for/list ([d (in-list raw-dom)])
+                     (subst-dom-objs argtys argobjs d)))
+       (define rng (subst-dom-objs argtys argobjs raw-rng))
+       (with-lexical-env+props-simple
+           arg-props
+         #:absurd (if expected
+                      (fix-results expected)
+                      (ret -Bottom))
+         (define maybe-substitution
+           (extend-tvars vars
+                         (infer/vararg vars null argtys dom #f rng
+                                       (and expected
+                                            (tc-results->values expected))
+                                       #:objs argobjs)))
+         (cond
+           [maybe-substitution
+            (values->tc-results/explicit-subst
+             (subst-all maybe-substitution rng) '())]
+           [else
+            (poly-fail f-stx args-stx f-type args-res
+                       #:name (and (identifier? f-stx) f-stx)
+                       #:expected expected)]))]
       ;; Row polymorphism. For now we do really dumb inference that only works
       ;; in very restricted cases, but is probably enough for most cases in
       ;; the Racket codebase. Eventually this should be extended.
@@ -243,4 +313,4 @@
         "Cannot apply expression of type ~a, since it is not a function type"
         f-type)]))
   ;; keep any info learned from the arguments
-  (add-unconditional-prop result (apply -and (map -or argps+ argps-))))
+  (add-unconditional-prop result (apply -and arg-props)))

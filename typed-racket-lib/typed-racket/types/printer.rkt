@@ -658,6 +658,11 @@
     ;[(fld: t a m) `(fld ,(type->sexp t))]
     [(Distinction: name sym ty) ; from define-new-subtype
      name]
+    [(DFun/pretty-ids: ids dom rng)
+     `(-> ,(for/list ([id (in-list ids)]
+                      [d (in-list dom)])
+             (list (syntax-e id) ': (t->s d)))
+          ,(values->sexp rng))]
     [else `(Unknown Type: ,(struct->vector type))]))
 
 

@@ -8,7 +8,8 @@
  (rep type-rep prop-rep object-rep fme-utils)
  (utils tc-utils)
  (env type-name-env row-constraint-env)
- (rep core-rep rep-utils type-mask values-rep base-types numeric-base-types)
+ (rep core-rep rep-utils free-ids type-mask values-rep
+      base-types numeric-base-types)
  (types resolve utils printer match-expanders union)
  (prefix-in t: (types abbrev numeric-tower subtype))
  (private parse-type syntax-properties)
@@ -522,7 +523,8 @@
                                  unsafe-spp/sc
                                  safe-spp/sc)])
           (or/sc optimized/sc (t->sc/fun t)))]
-       [(and t (? Fun?)) (t->sc/fun t)]
+       [(? Fun? t) (t->sc/fun t)]
+       [(? DFun? t) (t->sc/fun t)]
        [(Set: t) (set/sc (t->sc t))]
        [(Sequence: ts) (apply sequence/sc (map t->sc ts))]
        [(Vector: t) (vectorof/sc (t->sc/both t))]
@@ -744,35 +746,36 @@
   (define (t->sc/neg t #:recursive-values (recursive-values recursive-values))
     (loop t (flip-side typed-side) recursive-values))
 
-  ;; handle-range : Arr (-> Static-Contact) -> Static-Contract
+  ;; handle-arrow-range : Arr (-> Static-Contact) -> Static-Contract
   ;; Match the range of an arr and determine if a contract can be generated
   ;; and call the given thunk or raise an error
-  (define (handle-range arrow convert-arrow)
+  (define (handle-arrow-range arrow proceed)
     (match arrow
-      ;; functions with no props or objects
-      [(Arrow: _ _ _
-               (Values: (list (Result: _
-                                       (PropSet: (TrueProp:)
-                                                 (TrueProp:))
-                                       (Empty:)) ...)))
-       (convert-arrow)]
+      [(or (Arrow: _ _ _ rng)
+           (DFun: _ rng))
+       (handle-range rng proceed)]))
+  (define (handle-range rng proceed)
+    (match rng
+      [(Values: (list (Result: _
+                               (PropSet: (TrueProp:)
+                                         (TrueProp:))
+                               (Empty:)) ...))
+       (proceed)]
       ;; Functions that don't return
-      [(Arrow: _ _ _
-               (Values: (list (Result: (== -Bottom) _ _) ...)))
-       (convert-arrow)]
+      [(Values: (list (Result: (== -Bottom) _ _) ...))
+       (proceed)]
       ;; functions with props or objects
-      [(Arrow: _ _ _ (Values: (list (Result: rngs _ _) ...)))
+      [(Values: (list (Result: rngs _ _) ...))
        (if (from-untyped? typed-side)
            (fail #:reason (~a "cannot generate contract for function type"
                               " with props or objects."))
-           (convert-arrow))]
-      [(Arrow: _ _ _ (? ValuesDots?))
+           (proceed))]
+      [(? ValuesDots?)
        (fail #:reason (~a "cannot generate contract for function type"
                           " with dotted return values"))]
-      [(Arrow: _ _ _ (? AnyValues?))
+      [(? AnyValues?)
        (fail #:reason (~a "cannot generate contract for function type"
                           " with unknown return values"))]))
-
   (match f
     [(Fun: arrows)
      ;; Try to generate a single `->*' contract if possible.
@@ -807,7 +810,7 @@
          (define range (map t->sc rngs))
          (define rest (and rst (listof/sc (t->sc/neg rst))))
          (function/sc (from-typed? typed-side) (process-dom mand-args) opt-args mand-kws opt-kws rest range))
-       (handle-range first-arrow convert-arrow)]
+       (handle-arrow-range first-arrow convert-arrow)]
       [else
        (define ((f case->) a)
          (define (convert-arr arr)
@@ -837,7 +840,7 @@
                                    (hash-set recursive-values dbound (same any/sc))))]
                       [_ #f])
                     (map t->sc rngs))))]))
-         (handle-range a (λ () (convert-arr a))))
+         (handle-arrow-range a (λ () (convert-arr a))))
        (define arities
          (for/list ([t (in-list arrows)]) (length (Arrow-dom t))))
        (define maybe-dup (check-duplicates arities))
@@ -845,7 +848,28 @@
          (fail #:reason (~a "function type has two cases of arity " maybe-dup)))
        (if (= (length arrows) 1)
            ((f #f) (first arrows))
-           (case->/sc (map (f #t) arrows)))])]))
+           (case->/sc (map (f #t) arrows)))])]
+    [(DFun/ids: ids dom rng)
+     (define (continue)
+       (match rng
+         [(Values: (list (Result: rngs _ _) ...))
+          (define (dom-id? id) (member id ids free-identifier=?))
+          (define-values (dom* dom-deps)
+            (for/lists (_1 _2) ([d (in-list dom)])
+              (values (t->sc/neg d)
+                      (filter dom-id? (free-ids d)))))
+          (define rng* (map t->sc rngs))
+          (define rng-deps (filter dom-id?
+                                   (remove-duplicates
+                                    (apply append (map free-ids rngs))
+                                    free-identifier=?)))
+          (dep-function/sc (from-typed? typed-side)
+                           ids
+                           dom*
+                           dom-deps
+                           rng*
+                           rng-deps)]))
+     (handle-range rng continue)]))
 
 ;; Generate a contract for a object/class method clause
 ;; Precondition: type is a valid method type
@@ -864,6 +888,17 @@
      (t->sc/function type fail typed-side recursive-values loop #t)]
     [_ (fail #:reason "invalid method type")]))
 
+(define (is-a-function-type? initial)
+  (let loop ([ty initial])
+    (match (resolve ty)
+      [(? Fun?) #t]
+      [(? DFun?) #t]
+      [(Union: _ elems) (andmap loop elems)]
+      [(Intersection: elems _) (ormap loop elems)]
+      [(Poly: _ body) (loop body)]
+      [(PolyDots: _ body) (loop body)]
+      [_ #f])))
+
 ;; Generate a contract for a polymorphic function type
 (define (t->sc/poly type fail typed-side recursive-values t->sc)
   (match-define (Poly: vs b) type)
@@ -874,16 +909,7 @@
         (t->sc b #:recursive-values recursive-values))
       ;; in negative position, use parametric contracts.
       (match-let ([(Poly-names: vs-nm b) type])
-        (define function-type?
-          (let loop ([ty b])
-            (match (resolve ty)
-              [(? Fun?) #t]
-              [(Union: _ elems) (andmap loop elems)]
-              [(Intersection: elems _) (ormap loop elems)]
-              [(Poly: _ body) (loop body)]
-              [(PolyDots: _ body) (loop body)]
-              [_ #f])))
-        (unless function-type?
+        (unless (is-a-function-type? b)
           (fail #:reason "cannot generate contract for non-function polymorphic type"))
         (let ((temporaries (generate-temporaries vs-nm)))
           (define rv (for/fold ((rv recursive-values)) ((temp temporaries)
@@ -912,17 +938,7 @@
         (extend-row-constraints vs (list constraints)
           (t->sc body #:recursive-values recursive-values)))
       (match-let ([(PolyRow-names: vs-nm constraints b) type])
-        ;; FIXME: abstract this
-        (define function-type?
-          (let loop ([ty b])
-            (match (resolve ty)
-              [(? Fun?) #t]
-              [(Union: _ elems) (andmap loop elems)]
-              [(Intersection: elems _) (ormap loop elems)]
-              [(Poly: _ body) (loop body)]
-              [(PolyDots: _ body) (loop body)]
-              [_ #f])))
-        (unless function-type?
+        (unless (is-a-function-type? b)
           (fail #:reason "cannot generate contract for non-function polymorphic type"))
         (let ([temporaries (generate-temporaries vs-nm)])
           (define rv (for/fold ([rv recursive-values])

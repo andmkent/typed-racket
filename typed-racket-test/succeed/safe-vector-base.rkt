@@ -1,0 +1,25 @@
+#lang typed/racket/base
+
+(require typed/racket/unsafe)
+
+(unsafe-require/typed/provide 
+ racket/unsafe/ops
+ [unsafe-vector-ref
+  (All (A) (-> ([v : (Vectorof A)]
+                [n : (v) Natural #:where (< n (vector-length v))])
+               A))]
+ [unsafe-vector-set!
+  (All (A) (-> ([v : (Vectorof A)]
+                [n : (v) Natural #:where (< n (vector-length v))]
+                [a : A])
+               Void))])
+
+(unsafe-require/typed/provide 
+ typed/racket/base
+ [make-vector
+  (All (A) (-> ([size : Natural]
+                [val : A])
+               (Refine [v : (Vectorof A)]
+                       (= size (vector-length v)))))])
+
+
