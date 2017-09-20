@@ -684,19 +684,23 @@
                                              (-lexp x)))])
            (-refine/fresh n -Int (-leq (-lexp n)
                                        (-lexp w x y z))))]
-   ;; function refinement shorthand so we don't have
-   ;; what feels like superfluous binding ids
-   [(-> ([w : (y) Integer #:where (<= w y)]
+   ;; #:pre condition
+   [(-> ([w : Integer]
          [x : Integer]
-         [y : (z x) Integer #:where (<= y (+ x z))]
-         [z : (x) Integer #:where (<= z x)])
+         [y : Integer]
+         [z : Integer])
+        #:pre (w x y z)
+        (and (<= w y)
+             (<= y (+ x z))
+             (<= z x))
         (Refine [n : Integer] (<= n (+ w x y z))))
-    (dep-> ([w : (-refine/fresh n -Int (-leq (-lexp n) (-lexp y)))]
+    (dep-> ([w : -Int]
             [x : -Int]
-            [y : (-refine/fresh n -Int (-leq (-lexp n)
-                                             (-lexp x z)))]
-            [z : (-refine/fresh n -Int (-leq (-lexp n)
-                                             (-lexp x)))])
+            [y : -Int]
+            [z : -Int])
+           #:pre (-and (-leq (-lexp w) (-lexp y))
+                       (-leq (-lexp y) (-lexp x z))
+                       (-leq (-lexp z) (-lexp x)))
            (-refine/fresh n -Int (-leq (-lexp n)
                                        (-lexp w x y z))))]
 
@@ -739,6 +743,11 @@
    [FAIL (-> ([x : (y y) Integer]
               [y : Integer])
              Integer)]
+   [FAIL (-> ([x : Integer]
+              [y : Integer])
+             #:pre (x x y)
+             (<= x y)
+             Integer)]
    ;; listing self in dependency list
    [FAIL (-> ([x : (x y) Integer]
               [y : Integer])
@@ -757,6 +766,12 @@
    [FAIL (-> ([x : (z) (Refine [n : Integer] (= n fun-arg))]
               [fun-arg : Integer]
               [z : Integer])
+             Integer)]
+   [FAIL (-> ([x : Integer]
+              [y : Integer])
+             #:pre (x y)
+             (and (<= x y)
+                  (<= x this-is-an-unbound-identifier))
              Integer)]
    [FAIL (-> ([x : Integer]
               [y : Integer])

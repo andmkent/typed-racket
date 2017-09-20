@@ -4031,7 +4031,8 @@
        ;; dependent function type basics
        [tc-e (let ()
                (: safe-ref (-> ([v : (Vectorof Any)]
-                                [i : (v) Natural #:where (< i (vector-length v))])
+                                [i : Natural])
+                               #:pre (i v) (< i (vector-length v))
                                Any))
                (define (safe-ref a b)
                  (vector-ref a b))
@@ -4039,8 +4040,10 @@
              -Void]
        [tc-e (let ()
                (: sum-ref (-> ([v : (Vectorof Number)]
-                               [i : (v) Natural #:where (< i (vector-length v))]
-                               [j : (i v) Natural #:where (< i j (vector-length v))])
+                               [i : Natural]
+                               [j : Natural])
+                                 #:pre (i j v) (and (< i (vector-length v))
+                                                    (< i j (vector-length v)))
                               Any))
                (define (sum-ref v a b)
                  (+ (vector-ref v a)
@@ -4050,35 +4053,40 @@
        ;; ensure currently unsupported functions error for DFun types
        [tc-err (let ()
                  (: safe-ref (-> ([v : (Vectorof Any)]
-                                  [i : (v) Natural #:where (< i (vector-length v))])
+                                  [i : Natural])
+                                 #:pre (i v) (< i (vector-length v))
                                  Any))
                  (define (safe-ref a) 42)
                  (error "unsupported"))
                #:msg #rx"Expected 2.*given 1"]
        [tc-err (let ()
                  (: safe-ref (-> ([v : (Vectorof Any)]
-                                  [i : (v) Natural #:where (< i (vector-length v))])
+                                  [i : Natural])
+                                 #:pre (i v) (< i (vector-length v))
                                  Any))
                  (define (safe-ref a b c) 42)
                  (error "unsupported"))
                #:msg #rx"Expected 2.*given 3"]
        [tc-err (let ()
                  (: safe-ref (-> ([v : (Vectorof Any)]
-                                  [i : (v) Natural #:where (< i (vector-length v))])
+                                  [i : Natural])
+                                 #:pre (i v) (< i (vector-length v))
                                  Any))
                  (define (safe-ref a b [c 42]) 42)
                  (error "unsupported"))
                #:msg #rx"single arity"]
        [tc-err (let ()
                  (: safe-ref (-> ([v : (Vectorof Any)]
-                                  [i : (v) Natural #:where (< i (vector-length v))])
+                                  [i : Natural])
+                                 #:pre (i v) (< i (vector-length v))
                                  Any))
                  (define (safe-ref a b . c) 42)
                  (error "unsupported"))
                #:msg #rx"not currently support rest arguments"]
        [tc-err (let ()
                  (: safe-ref (-> ([v : (Vectorof Any)]
-                                  [i : (v) Natural #:where (< i (vector-length v))])
+                                  [i : Natural])
+                                 #:pre (i v) (< i (vector-length v))
                                  Any))
                  (define safe-ref
                    (case-lambda
@@ -4090,7 +4098,8 @@
        ;; polymorphic dependent function
        [tc-e (let ()
                (: safe-ref (All (A) (-> ([v : (Vectorof A)]
-                                         [i : (v) Natural #:where (< i (vector-length v))])
+                                         [i : Natural])
+                                        #:pre (i v) (< i (vector-length v))
                                         A)))
                (define (safe-ref xs n)
                  (vector-ref xs n))
@@ -4098,7 +4107,8 @@
              -Void]
        [tc-err (let ()
                  (: safe-ref (All (A) (-> ([v : (Vectorof A)]
-                                           [i : (v) Natural #:where (< i (vector-length v))])
+                                           [i : Natural])
+                                          #:pre (i v) (< i (vector-length v))
                                           A)))
                  (define (safe-ref xs n)
                    (void))
@@ -4109,14 +4119,16 @@
                (: x Byte)
                (define x 42)
                (: == (-> ([x : Integer]
-                          [y : (x) Integer #:where (= x y)])
+                          [y : Integer])
+                         #:pre (x y) (= x y)
                          Any))
                (define (== a b) 'yay)
                (== x x))
              Univ]
        [tc-e (let ()
                (: safe-ref (-> ([v : (Vectorof Any)]
-                                [i : (v) Natural #:where (< i (vector-length v))])
+                                [i : Natural])
+                               #:pre (i v) (< i (vector-length v))
                                Any))
                (define (safe-ref xs n) (error 'foo))
                (: three-vals (-> (Refine [v : (Vectorof Any)] (= 3 (vector-length v)))))
@@ -4130,7 +4142,8 @@
                  (: y Byte)
                  (define y 43)
                  (: == (-> ([x : Integer]
-                            [y : (x) Integer #:where (= x y)])
+                            [y : Integer])
+                           #:pre (x y) (= x y)
                            Any))
                  (define (== a b) 'yay)
                  (== x y))
@@ -4138,7 +4151,8 @@
                #:msg #rx"expected: .*given: Byte.*"]
        [tc-err (let ()
                  (: safe-ref (-> ([v : (Vectorof Any)]
-                                  [i : (v) Natural #:where (< i (vector-length v))])
+                                  [i : Natural])
+                                 #:pre (i v) (< i (vector-length v))
                                  Any))
                  (define (safe-ref xs n) (error 'foo))
                  (: three-vals (-> (Refine [v : (Vectorof Any)] (= 3 (vector-length v)))))
@@ -4149,7 +4163,8 @@
        ;; polymorphic dependent function application
        [tc-e (let ()
                (: safe-ref (All (A) (-> ([v : (Vectorof A)]
-                                         [i : (v) Natural #:where (< i (vector-length v))])
+                                         [i : Natural])
+                                        #:pre (i v) (< i (vector-length v))
                                         A)))
                (define (safe-ref xs n) (error 'foo))
                (: three-syms (-> (Refine [v : (Vectorof Symbol)] (= 3 (vector-length v)))))
@@ -4158,7 +4173,8 @@
              -Symbol]
        [tc-err (let ()
                  (: safe-ref (All (A) (-> ([v : (Vectorof A)]
-                                           [i : (v) Natural #:where (< i (vector-length v))])
+                                           [i : Natural])
+                                          #:pre (i v) (< i (vector-length v))
                                           A)))
                  (define (safe-ref xs n) (error 'foo))
                  (: three-syms (-> (Refine [v : (Vectorof Symbol)] (= 3 (vector-length v)))))

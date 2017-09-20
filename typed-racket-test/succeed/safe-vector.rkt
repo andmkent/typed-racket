@@ -35,11 +35,11 @@
 
 
 (: vector-copy (All (A) (-> ([vec : (Vectorof A)]
-                             [start : (vec) Natural
-                                    #:where (<= start (vector-length vec))]
-                             [end : (start vec) Natural
-                                  #:where (and (<= start end)
-                                               (<= end (vector-length vec)))])
+                             [start : Natural]
+                             [end : Natural])
+                            #:pre (vec start end)
+                            (and (<= start (vector-length vec))
+                                 (<= start end (vector-length vec)))
                             (Refine [res : (Vectorof A)] (= (- end start)
                                                             (vector-length res))))))
 (define (vector-copy vec start end)
@@ -90,8 +90,8 @@
 
 
 (: vector-split-at (All (A) (-> ([vec : (Vector A)]
-                                 [pos : (vec) Natural
-                                      #:where (<= pos (vector-length vec))])
+                                 [pos : Natural])
+                                #:pre (vec pos) (<= pos (vector-length vec))
                                 (values (Refine [v1 : (Vectorof A)]
                                                 (= (vector-length v1) pos))
                                         (Refine [v2 : (Vectorof A)]

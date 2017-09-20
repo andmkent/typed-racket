@@ -6,12 +6,14 @@
  racket/unsafe/ops
  [unsafe-vector-ref
   (All (A) (-> ([v : (Vectorof A)]
-                [n : (v) Natural #:where (< n (vector-length v))])
+                [n : Natural])
+               #:pre (v n) (< n (vector-length v))
                A))]
  [unsafe-vector-set!
   (All (A) (-> ([v : (Vectorof A)]
-                [n : (v) Natural #:where (< n (vector-length v))]
+                [n : Natural]
                 [a : A])
+               #:pre (v n) (< n (vector-length v))
                Void))])
 
 (unsafe-require/typed/provide 
