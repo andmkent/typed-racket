@@ -80,10 +80,11 @@
                    (and rst (subst rst))
                    (map subst kws)
                    (subst/lvl rng (add1 lvl)))]
-      [(DFun: dom rng)
-       (make-DFun (for/list ([d (in-list dom)])
-                    (subst/lvl d (add1 lvl)))
-                  (subst/lvl rng (add1 lvl)))]
+      [(DepFun: dom pre rng)
+       (make-DepFun (for/list ([d (in-list dom)])
+                      (subst/lvl d (add1 lvl)))
+                    (subst/lvl pre (add1 lvl))
+                    (subst/lvl rng (add1 lvl)))]
       [(Intersection: ts raw-prop)
        (-refine (make-Intersection (map subst ts))
                 (subst/lvl raw-prop (add1 lvl)))]

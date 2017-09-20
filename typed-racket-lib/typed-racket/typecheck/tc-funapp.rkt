@@ -58,21 +58,6 @@
               #:when (not (Empty? o)))
      (list* idx o t))))
 
-;; helper function to check arguments for dependent functions are well typed
-;; (we can't reuse other pre-existing functions because their design is
-;;  tightly coupled to the case-> nature of Functions currently)
-(define (dfunapp-check! args-stx argress dom)
-  (unless (= (length dom) (length argress))
-    (tc-error/fields "could not apply function"
-                     #:more "wrong number of arguments provided"
-                     "expected" (length dom)
-                     "given" (length argress)
-                     #:delayed? #t))
-  (for ([a (in-syntax args-stx)]
-        [arg-res (in-list argress)]
-        [dom-t (in-list dom)])
-    (parameterize ([current-orig-stx a])
-      (check-below arg-res (ret dom-t)))))
 
 (define (tc/funapp f-stx args-stx f-type args-res expected)
   (match-define (list (tc-result1: argtys (PropSet: argps+ argps-) argobjs) ...) args-res)
@@ -94,20 +79,36 @@
       [(Fun: (list arrow))
        #:when (not (RestDots? (Arrow-rst arrow)))
        (tc/funapp1 f-stx args-stx arrow args-res expected)]
-      [(DFun: raw-dom raw-rng)
+      [(DepFun: raw-dom raw-pre raw-rng)
        (define subst (for/list ([o (in-list argobjs)]
                                 [t (in-list argtys)]
                                 [idx (in-naturals)])
                        (list* idx o t)))
        (define dom (for/list ([t (in-list raw-dom)])
                      (instantiate-obj+simplify t subst)))
+       (define pre (instantiate-obj+simplify raw-pre subst))
        (define rng (values->tc-results/explicit-subst raw-rng subst))
        (with-lexical-env+props-simple
            arg-props
          #:absurd (if expected
                       (fix-results expected)
                       (ret -Bottom))
-         (dfunapp-check! args-stx args-res dom)
+         (unless (= (length dom) (length args-res))
+           (tc-error/fields "could not apply function"
+                            #:more "wrong number of arguments provided"
+                            "expected" (length dom)
+                            "given" (length args-res)
+                            #:delayed? #t))
+         (for ([a (in-syntax args-stx)]
+               [arg-res (in-list args-res)]
+               [dom-t (in-list dom)])
+           (parameterize ([current-orig-stx a])
+             (check-below arg-res (ret dom-t))))
+         (unless (implies-in-env? -tt pre)
+           (tc-error/fields "could not apply function"
+                            #:more "unable to prove precondition at application site"
+                            "precondition" pre
+                            #:delayed? #t))
          rng)]
       [(Fun: arrows)
        ;; check there are no RestDots
@@ -209,7 +210,7 @@
          #:args-results args-res
          #:expected expected)]
       ;; polymorphic dependent function
-      [(Poly: vars (DFun: raw-dom raw-rng))
+      [(Poly: vars (DepFun: raw-dom raw-pre raw-rng))
        (define dom (for/list ([d (in-list raw-dom)])
                      (subst-dom-objs argtys argobjs d)))
        (define rng (subst-dom-objs argtys argobjs raw-rng))
@@ -226,8 +227,16 @@
                                        #:objs argobjs)))
          (cond
            [maybe-substitution
+            (define pre (subst-all maybe-substitution
+                                   (subst-dom-objs argtys argobjs raw-pre)))
+            (unless (implies-in-env? -tt pre)
+              (tc-error/fields "could not apply function"
+                               #:more "unable to prove precondition at application site"
+                               "precondition" pre
+                               #:delayed? #t))
             (values->tc-results/explicit-subst
-             (subst-all maybe-substitution rng) '())]
+             (subst-all maybe-substitution rng)
+             '())]
            [else
             (poly-fail f-stx args-stx f-type args-res
                        #:name (and (identifier? f-stx) f-stx)

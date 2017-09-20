@@ -9,7 +9,8 @@
          racket/set
          (path-up "rep/type-rep.rkt" "rep/prop-rep.rkt" "rep/object-rep.rkt"
                   "rep/core-rep.rkt" "rep/values-rep.rkt" "rep/fme-utils.rkt"
-                  "rep/rep-utils.rkt" "types/subtype.rkt" "types/overlap.rkt"
+                  "rep/rep-utils.rkt" "rep/free-ids.rkt"
+                  "types/subtype.rkt" "types/overlap.rkt"
                   "types/match-expanders.rkt"
                   "types/kw-types.rkt"
                   "types/utils.rkt" "types/abbrev.rkt"
@@ -658,10 +659,22 @@
     ;[(fld: t a m) `(fld ,(type->sexp t))]
     [(Distinction: name sym ty) ; from define-new-subtype
      name]
-    [(DFun/pretty-ids: ids dom rng)
+    [(DepFun/pretty-ids: ids dom pre rng)
+     (define (arg-id? id) (member id ids free-identifier=?))
+     (define pre-deps (filter arg-id? (free-ids pre)))
      `(-> ,(for/list ([id (in-list ids)]
                       [d (in-list dom)])
-             (list (syntax-e id) ': (t->s d)))
+             (define deps (filter arg-id? (free-ids d)))
+             `(,(syntax-e id)
+               :
+               ,@(if (null? deps)
+                     '()
+                     (list deps))
+               ,(t->s d)))
+          ,@(cond
+              [(TrueProp? pre) '()]
+              [(null? pre-deps) `((#:pre ,(prop->sexp pre)))]
+              [else `((#:pre ,pre-deps ,(prop->sexp pre)))])
           ,(values->sexp rng))]
     [else `(Unknown Type: ,(struct->vector type))]))
 

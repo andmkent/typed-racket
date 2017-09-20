@@ -65,8 +65,8 @@
          instantiate-obj
          abstract-obj
          substitute-names
-         DFun/ids:
-         DFun/pretty-ids:
+         DepFun/ids:
+         DepFun/pretty-ids:
          (rename-out [Union:* Union:]
                      [Intersection:* Intersection:]
                      [make-Intersection* make-Intersection]
@@ -559,37 +559,40 @@
   [#:for-each (f) (for-each f arrows)])
 
 
-;; a function with dependent arguments
-(def-type DFun ([dom (listof Type?)]
-                [rng SomeValues?])
+;; a function with dependent arguments and/or a pre-condition
+(def-type DepFun ([dom (listof Type?)]
+                  [pre Prop?]
+                  [rng SomeValues?])
   [#:mask mask:procedure]
-  [#:frees (f) (combine-frees (cons (f rng)
-                                    (for/list ([d (in-list dom)])
-                                      (flip-variances (f d)))))]
-  [#:fmap (f) (make-DFun (map f dom) (f rng))]
-  [#:for-each (f) (for-each f dom) (f rng)])
+  [#:frees (f) (combine-frees (list* (f rng)
+                                     (flip-variances (f pre))
+                                     (for/list ([d (in-list dom)])
+                                       (flip-variances (f d)))))]
+  [#:fmap (f) (make-DepFun (map f dom) (f pre) (f rng))]
+  [#:for-each (f) (for-each f dom) (f pre) (f rng)])
 
 
-(define-for-syntax (DFun-id-matcher id-fun)
+(define-for-syntax (DepFun-id-matcher id-fun)
   (λ (stx)
     (syntax-case stx ()
-      [(_ ids dom rng)
+      [(_ ids dom pre rng)
        (quasisyntax/loc stx
          (app (match-lambda
-                [(DFun: raw-dom raw-rng)
+                [(DepFun: raw-dom raw-pre raw-rng)
                  (define fresh-ids (for/list ([_ (in-list raw-dom)]) (#,id-fun)))
                  (define (instantiate rep) (instantiate-obj rep fresh-ids))
                  (list fresh-ids
                        (map instantiate raw-dom)
+                       (instantiate raw-pre)
                        (instantiate raw-rng))]
                 [_ #f])
-              (list ids dom rng)))])))
+              (list ids dom pre rng)))])))
 
-(define-match-expander DFun/ids:
-  (DFun-id-matcher #'genid))
+(define-match-expander DepFun/ids:
+  (DepFun-id-matcher #'genid))
 
-(define-match-expander DFun/pretty-ids:
-  (DFun-id-matcher #'gen-pretty-id))
+(define-match-expander DepFun/pretty-ids:
+  (DepFun-id-matcher #'gen-pretty-id))
 
 ;;************************************************************
 ;; Structs
@@ -1366,10 +1369,11 @@
                    (and rst (rec rst))
                    (map rec kws)
                    (rec/inc rng))]
-      [(DFun: dom rng)
-       (make-DFun (for/list ([d (in-list dom)])
-                    (rec/lvl d (add1 lvl)))
-                  (rec/inc rng))]
+      [(DepFun: dom pre rng)
+       (make-DepFun (for/list ([d (in-list dom)])
+                      (rec/inc d))
+                    (rec/inc pre)
+                    (rec/inc rng))]
       ;; Refinement types e.g. {x ∈ τ | ψ(x)}
       ;; increment the level of the substituted object
       [(Intersection: ts p _) (-refine

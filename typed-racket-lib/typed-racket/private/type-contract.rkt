@@ -524,7 +524,7 @@
                                  safe-spp/sc)])
           (or/sc optimized/sc (t->sc/fun t)))]
        [(? Fun? t) (t->sc/fun t)]
-       [(? DFun? t) (t->sc/fun t)]
+       [(? DepFun? t) (t->sc/fun t)]
        [(Set: t) (set/sc (t->sc t))]
        [(Sequence: ts) (apply sequence/sc (map t->sc ts))]
        [(Vector: t) (vectorof/sc (t->sc/both t))]
@@ -752,7 +752,7 @@
   (define (handle-arrow-range arrow proceed)
     (match arrow
       [(or (Arrow: _ _ _ rng)
-           (DFun: _ rng))
+           (DepFun: _ _ rng))
        (handle-range rng proceed)]))
   (define (handle-range rng proceed)
     (match rng
@@ -849,7 +849,7 @@
        (if (= (length arrows) 1)
            ((f #f) (first arrows))
            (case->/sc (map (f #t) arrows)))])]
-    [(DFun/ids: ids dom rng)
+    [(DepFun/ids: ids dom pre rng)
      (define (continue)
        (match rng
          [(Values: (list (Result: rngs _ _) ...))
@@ -858,17 +858,21 @@
             (for/lists (_1 _2) ([d (in-list dom)])
               (values (t->sc/neg d)
                       (filter dom-id? (free-ids d)))))
+          (define pre* (t->sc/neg pre))
+          (define pre-deps (filter dom-id? (free-ids pre)))
           (define rng* (map t->sc rngs))
           (define rng-deps (filter dom-id?
                                    (remove-duplicates
                                     (apply append (map free-ids rngs))
                                     free-identifier=?)))
-          (dep-function/sc (from-typed? typed-side)
-                           ids
-                           dom*
-                           dom-deps
-                           rng*
-                           rng-deps)]))
+          (->i/sc (from-typed? typed-side)
+                  ids
+                  dom*
+                  dom-deps
+                  pre*
+                  pre-deps
+                  rng*
+                  rng-deps)]))
      (handle-range rng continue)]))
 
 ;; Generate a contract for a object/class method clause
@@ -892,7 +896,7 @@
   (let loop ([ty initial])
     (match (resolve ty)
       [(? Fun?) #t]
-      [(? DFun?) #t]
+      [(? DepFun?) #t]
       [(Union: _ elems) (andmap loop elems)]
       [(Intersection: elems _) (ormap loop elems)]
       [(Poly: _ body) (loop body)]

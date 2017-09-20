@@ -408,30 +408,31 @@
                         f* b* dom (values->tc-results rng (formals->objects f*)) rst)]))])))))
 
 (define (tc/dep-lambda formalss-stx bodies-stx dep-fun-ty)
-  (match-define (DFun: dom rng) dep-fun-ty)
+  (match-define (DepFun: raw-dom raw-pre raw-rng) dep-fun-ty)
   (define formalss (stx-map make-formals formalss-stx))
   (define bodies (syntax->list bodies-stx))
   (match* (formalss bodies)
     [((list fs) (list body))
      (cond
        [(not (= (length (formals-positional fs))
-                (length dom)))
+                (length raw-dom)))
         (tc-error/expr #:return dep-fun-ty
                        (format "Expected ~a positional arguments, given ~a."
-                               (length dom)
+                               (length raw-dom)
                                (length (formals-positional fs))))]
        [(formals-rest fs)
         (tc-error/expr #:return dep-fun-ty
                        "Dependent functions do not currently support rest arguments.")]
        [else
         (define arg-names (formals-positional fs))
-        (define instantiated-deps
-          (for/list ([d (in-list dom)])
-            (instantiate-obj d arg-names)))
-        (with-extended-lexical-env
+        (define dom (for/list ([d (in-list raw-dom)])
+                      (instantiate-obj d arg-names)))
+        (define pre (instantiate-obj raw-pre arg-names))
+        (with-naively-extended-lexical-env
             [#:identifiers arg-names
-             #:types instantiated-deps]
-          (tc-body/check body (values->tc-results rng (map -id-path arg-names))))
+             #:types dom
+             #:props (list pre)]
+          (tc-body/check body (values->tc-results raw-rng (map -id-path arg-names))))
         dep-fun-ty])]
     [(fs bs)
      (tc-error/expr #:return dep-fun-ty
@@ -439,7 +440,7 @@
 
 (define (tc/mono-lambda/type formalss bodies expected)
   (match expected
-    [(tc-result1:(? DFun? dep-fun-ty))
+    [(tc-result1:(? DepFun? dep-fun-ty))
      (tc/dep-lambda formalss bodies dep-fun-ty)]
     [_ (make-Fun
         (tc/mono-lambda

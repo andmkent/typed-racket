@@ -249,14 +249,12 @@
 
 (define-syntax-class dependent-fun-arg
   #:description "dependent function argument"
-  #:attributes (name local-name deps type-stx refinement-prop-stx)
+  #:attributes (name local-name deps type-stx)
   (pattern [name:id
             :colon^
             (~optional (dep:id ...)
                        #:defaults ([(dep 1) null]))
-            type-stx:expr
-            (~optional (~seq #:where refinement-prop-stx:expr)
-                       #:defaults ([refinement-prop-stx #'Top]))]
+            type-stx:expr]
            #:attr local-name (id->local-id #'name)
            #:attr deps (syntax->list #'(name dep ...))))
 
@@ -747,10 +745,14 @@
       ;; e.g. (-> ([x : τ] ...+) τ)
       [(:->^ (args:dependent-fun-arg ...+)
              ~!
+             (~optional (~seq #:pre (pre-dep-stx:id ...) pre-stx:expr)
+                        #:defaults ([pre-stx #'Top]
+                                    [(pre-dep-stx 1) null]))
              rng-type:non-keyword-ty
              (~seq (~optional (~seq #:+ rng-p+:expr))
                    (~optional (~seq #:- rng-p-:expr))
                    (~optional (~seq #:object rng-o:expr))))
+       (define pre-deps (syntax->list #'(pre-dep-stx ...)))
        (cond
          ;; check for duplicates in arg names
          [(check-duplicates (attribute args.name) free-identifier=?)
@@ -762,10 +764,23 @@
                  (car deplist)))
           => (λ (arg-id) (parse-error (format "Argument ~a depends on itself."
                                               (syntax->datum arg-id))))]
-         ;; check for duplicates in dep lists
-         [(for/or ([deplist (in-list (attribute args.deps))])
-            (and (check-duplicates (cdr deplist) free-identifier=?)
-                 deplist))
+         ;; check for non-arg names in arg dep lists and #:pre dep list
+         [(or (for*/or ([deplist (in-list (attribute args.deps))]
+                        [dep (in-list (cdr deplist))])
+                (and (not (assoc dep (attribute args.deps) free-identifier=?))
+                     dep))
+              (for/or ([dep (in-list pre-deps)])
+                (and (not (assoc dep (attribute args.deps) free-identifier=?))
+                     dep)))
+          => (λ (dep-id) (parse-error
+                          (format "unknown dependent variable ~a; not an argument of the function"
+                                  (syntax->datum dep-id))))]
+         ;; check for duplicates in arg dep lists and #:pre dep list
+         [(or (for/or ([deplist (in-list (attribute args.deps))])
+                (and (check-duplicates (cdr deplist) free-identifier=?)
+                     deplist))
+              (and (check-duplicates pre-deps free-identifier=?)
+                   pre-deps))
           => (λ (deps) (parse-error (format "Repeated identifier(s) in dependency list: ~a"
                                             (map syntax->datum deps))))]
          ;; check for cycles in the dep lists
@@ -782,6 +797,8 @@
                                           (syntax->datum x)
                                           (syntax->datum y))))))]
          [else
+          ;; end of DepFun-specific error checking =)
+          ;; let's keep going!
           (define arg-order (arg-deps->idx-order (attribute args.deps)))
           (define arg-type-dict (make-hasheq))
           (for ([idx (in-list arg-order)])
@@ -797,17 +814,7 @@
                   [#:identifiers dep-local-ids
                    #:types dep-local-types]
                 (with-local-term-names (map cons dep-ids dep-local-ids)
-                  (define type (parse-type (list-ref (attribute args.type-stx) idx)))
-                  (define prop-stx (list-ref (attribute args.refinement-prop-stx) idx))
-                  (define orig-id (list-ref (attribute args.name) idx))
-                  (define local-id (list-ref (attribute args.local-name) idx))
-                  (-refine local-id
-                           type
-                           (with-extended-lexical-env
-                               [#:identifiers (list local-id)
-                                #:types (list type)]
-                             (with-local-term-names (list (cons orig-id local-id))
-                               (parse-prop prop-stx)))))))
+                  (parse-type (list-ref (attribute args.type-stx) idx)))))
 
             (hash-set! arg-type-dict idx idx-type))
           (define (abstract rep)
@@ -821,6 +828,8 @@
             (with-local-term-names (map cons
                                         (attribute args.name)
                                         (attribute args.local-name))
+              (define pre-prop (parse-prop #'pre-stx))
+              (define abstracted-pre-prop (abstract pre-prop))
               (match (parse-values-type #'rng-type)
                 ;; single value'd return type, propositions/objects allowed
                 [(Values: (list (Result: rng-t _ _)))
@@ -838,13 +847,15 @@
                  (define abstracted-rng-obj (abstract rng-obj))
                  (cond
                    [(and (equal? dom abstracted-dom)
-                         (equal? rng-t abstracted-rng-t))
+                         (equal? rng-t abstracted-rng-t)
+                         (TrueProp? abstracted-pre-prop))
                     (make-Fun (list (-Arrow dom (-values abstracted-rng-t
                                                          abstracted-rng-ps
                                                          abstracted-rng-obj))))]
                    [else
-                    (make-DFun
+                    (make-DepFun
                      abstracted-dom
+                     abstracted-pre-prop
                      (-values abstracted-rng-t
                               abstracted-rng-ps
                               abstracted-rng-obj))])]
@@ -862,11 +873,13 @@
                  (define abstracted-rng-vals (abstract vals))
                  (cond
                    [(and (equal? dom abstracted-dom)
-                         (equal? vals abstracted-rng-vals))
+                         (equal? vals abstracted-rng-vals)
+                         (TrueProp? abstracted-pre-prop))
                     (make-Fun (list (-Arrow dom vals)))]
                    [else
-                    (make-DFun
+                    (make-DepFun
                      abstracted-dom
+                     abstracted-pre-prop
                      abstracted-rng-vals)])])))])]
       ;; curried function notation
       [((~and dom:non-keyword-ty (~not :->^)) ...

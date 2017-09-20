@@ -222,14 +222,21 @@
                    (instantiate-obj raw-rng2 ids)))])]))
 
 
+;; is an Arrow a subtype of a DepFun?
+;; more or less the following:
+;;        ⊢ T3 <: T1
+;; x : T3 ⊢ T2 <: T4
+;; -----------------------
+;; ⊢ (T1 → T2) <: (x:T3)→T4
 (define (arrow-subtype-dfun* A arrow dfun)
   (match* (arrow dfun)
-    [((Arrow: dom1     rst1 kws1 raw-rng1)
-      (DFun:  raw-dom2           raw-rng2))
+    [((Arrow:  dom1     rst1 kws1 raw-rng1)
+      (DepFun: raw-dom2 raw-pre2  raw-rng2))
      (define arity (max (length dom1) (length raw-dom2)))
      (with-fresh-ids arity ids
        (define dom2 (for/list ([d (in-list raw-dom2)])
                       (instantiate-obj d ids)))
+       (define pre2 (instantiate-obj raw-pre2 ids))
        (define A* (subtype-seq A
                                (rest-arg-subtype* rst1 #f)
                                (subtypes*/varargs dom2 dom1 rst1)
@@ -237,14 +244,19 @@
        (cond
          [(not A*) #f]
          [else
-          (define mapping
-            (for/list ([idx (in-range arity)]
-                       [id (in-list ids)]
-                       [t (in-list/rest dom2 Univ)])
-              (list* idx id t)))
-          (subval* A*
-                   (instantiate-obj+simplify raw-rng1 mapping)
-                   (instantiate-obj raw-rng2 ids))]))]))
+          (define-values (mapping t2s)
+            (for/lists (_1 _2)
+              ([idx (in-range arity)]
+               [id (in-list ids)]
+               [t (in-list/rest dom2 Univ)])
+              (values (list* idx id t) t)))
+          (with-naively-extended-lexical-env
+              [#:identifiers ids
+               #:types t2s
+               #:props (list pre2)]
+            (subval* A*
+                     (instantiate-obj+simplify raw-rng1 mapping)
+                     (instantiate-obj raw-rng2 ids)))]))]))
 
 ;;************************************************************
 ;; Prop 'Subtyping'
@@ -685,9 +697,9 @@
       ;; compared against evt-t here
       (subtype* A t1 evt-t)]
      [_ (continue<: A t1 t2 obj)])]
-  [(case: DFun (DFun: raw-dom1 raw-rng1))
+  [(case: DepFun (DepFun: raw-dom1 raw-pre1 raw-rng1))
    (match t2
-     [(DFun: raw-dom2 raw-rng2)
+     [(DepFun: raw-dom2 raw-pre2 raw-rng2)
       (cond
         [(not (= (length raw-dom1)
                  (length raw-dom2)))
@@ -696,16 +708,22 @@
          (with-fresh-ids (length raw-dom1) ids
            (define dom1 (for/list ([d (in-list raw-dom1)])
                           (instantiate-obj d ids)))
+           (define pre1 (instantiate-obj raw-pre1 ids))
            (define rng1 (instantiate-obj raw-rng1 ids))
            (define dom2 (for/list ([d (in-list raw-dom2)])
                           (instantiate-obj d ids)))
+           (define pre2 (instantiate-obj raw-pre2 ids))
            (define rng2 (instantiate-obj raw-rng2 ids))
            (with-naively-extended-lexical-env
                [#:identifiers ids
-                #:types dom2]
-             (subtype-seq A
-                          (subtypes*/varargs dom2 dom1 #f)
-                          (subval* rng1 rng2))))])]
+                #:types dom2
+                #:props (list pre2)]
+             (define A* (subtype-seq A
+                                     (subtypes*/varargs dom2 dom1 #f)
+                                     (subval* rng1 rng2)))
+
+             (and (implies-in-env? pre1 pre2)
+                  A*)))])]
      [(Fun: arrows2)
       (define arity (for/fold ([arity (length raw-dom1)])
                               ([a2 (in-list arrows2)])
@@ -713,6 +731,7 @@
       (with-fresh-ids arity ids
         (define dom1 (for/list ([d (in-list raw-dom1)])
                        (instantiate-obj d ids)))
+        (define pre1 (instantiate-obj raw-pre1 ids))
         (for/fold ([A A])
                   ([a2 (in-list arrows2)]
                    #:break (not A))
@@ -725,14 +744,21 @@
                [(not A*) #f]
                [else
                 (define arity (max (length dom1) (length dom2)))
-                (define mapping
-                  (for/list ([idx (in-range arity)]
-                             [id (in-list ids)]
-                             [t (in-list/rest dom2 (or rst2 Univ))])
-                    (list* idx id t)))
-                (subval* A*
-                         (instantiate-obj+simplify raw-rng1 mapping)
-                         (instantiate-obj raw-rng2 ids))])])))]
+                (define-values (mapping t2s)
+                  (for/lists (_1 _2)
+                    ([idx (in-range arity)]
+                     [id (in-list ids)]
+                     [t (in-list/rest dom2 (or rst2 Univ))])
+                    (values (list* idx id t) t)))
+                (with-naively-extended-lexical-env
+                    [#:identifiers ids
+                     #:types t2s]
+                  (define A-res
+                    (subval* A*
+                             (instantiate-obj+simplify raw-rng1 mapping)
+                             (instantiate-obj raw-rng2 ids)))
+                  (and (implies-in-env? -tt pre1)
+                       A-res))])])))]
      [_ (continue<: A t1 t2 obj)])]
   [(case: Distinction (Distinction: nm1 id1 t1*))
    (match t2
@@ -761,7 +787,7 @@
      [((Fun: (list arrow2)) (app collapsable-arrows? (? Arrow? arrow1)))
       (arrow-subtype* A arrow1 arrow2)]
      ;; special case when t1 can be collapsed into simpler arrow
-     [((? DFun? dfun) (app collapsable-arrows? (? Arrow? arrow1)))
+     [((? DepFun? dfun) (app collapsable-arrows? (? Arrow? arrow1)))
       (arrow-subtype-dfun* A arrow1 dfun)]
      [((Fun: arrows2) _)
       (cond
@@ -771,7 +797,7 @@
                          #:break (not A))
                 (for/or ([a1 (in-list arrows1)])
                   (arrow-subtype* A a1 a2)))])]
-     [((? DFun? dfun) _)
+     [((? DepFun? dfun) _)
       (for/or ([a1 (in-list arrows1)])
         (arrow-subtype-dfun* A a1 dfun))]
      [(_ _) (continue<: A t1 t2 obj)])]

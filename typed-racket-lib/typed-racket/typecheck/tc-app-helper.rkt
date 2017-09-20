@@ -264,7 +264,7 @@
                                                  ""))))))]
     [(Poly-names:
       msg-vars
-      (DFun/pretty-ids: ids domain rng))
+      (DepFun/pretty-ids: ids domain _ rng))
      (let ([fcn-string (name->function-str name)])
        (if (and (null? domain)
                 (null? argtypes))

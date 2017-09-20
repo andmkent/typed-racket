@@ -95,8 +95,8 @@
               [(with-refinements?)
                (map tc-dep-fun-arg args*)]
               [else (map single-value args*)])]
-           [(or (? DFun?)
-                (Poly-unsafe: _ (? DFun?)))
+           [(or (? DepFun?)
+                (Poly-unsafe: _ (? DepFun?)))
             (map tc-dep-fun-arg args*)]
            [(Fun: (app matching-arities
                        (list (Arrow: doms rsts _ _) ..1)))

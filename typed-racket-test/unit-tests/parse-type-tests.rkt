@@ -760,6 +760,10 @@
    [FAIL (-> ([x : (Refine [n : Integer] (= n this-is-an-unbound-identifier))]
               [y : Integer])
              Integer)]
+   [FAIL (-> ([x : (this-is-an-unbound-identifier)
+                 (Refine [n : Integer] (= n this-is-an-unbound-identifier))]
+              [y : Integer])
+             Integer)]
    [FAIL (-> ([x : (Refine [n : Integer] (= n fun-arg))]
               [fun-arg : Integer])
              Integer)]
@@ -770,6 +774,12 @@
    [FAIL (-> ([x : Integer]
               [y : Integer])
              #:pre (x y)
+             (and (<= x y)
+                  (<= x this-is-an-unbound-identifier))
+             Integer)]
+   [FAIL (-> ([x : Integer]
+              [y : Integer])
+             #:pre (x y this-is-an-unbound-identifier)
              (and (<= x y)
                   (<= x this-is-an-unbound-identifier))
              Integer)]

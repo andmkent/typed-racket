@@ -204,9 +204,10 @@
               ,@(if rest `(#:rest ,rest) '())
               ,@(if (null? kws) '() `(#:kws (list ,@kws))))]
     [(Fun: arrs) `(make-Fun (list ,@(map type->sexp arrs)))]
-    [(DFun: dom rng)
-     `(make-DFun (list ,@(map type->sexp dom))
-                 ,(type->sexp rng))]
+    [(DepFun: dom pre rng)
+     `(make-DepFun (list ,@(map type->sexp dom))
+                   ,(prop->sexp pre)
+                   ,(type->sexp rng))]
     [(Keyword: kw ty required?)
      `(make-Keyword (quote ,kw) ,(type->sexp ty) ,required?)]
     [(Values: rs)
