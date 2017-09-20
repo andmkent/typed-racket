@@ -765,6 +765,88 @@
                                      (-lexp (-id-path x))))])
            -Int)
     (-> -Int -Int -Int)]
+   [(-> -Int -Int -Int)
+    (dep-> ([x : -Int]
+            [y : -Int])
+           #:pre (-eq (-lexp (-id-path y))
+                      (-lexp (-id-path x)))
+           -Int)]
+   [FAIL
+    (dep-> ([x : -Int]
+            [y : -Int])
+           #:pre (-eq (-lexp (-id-path y))
+                      (-lexp (-id-path x)))
+           -Int)
+    (-> -Int -Int -Int)]
+   [(-> -Int -Int -Int)
+    (dep-> ([x : -Int]
+            [y : -Int])
+           #:pre (-leq (-lexp (-id-path x))
+                       (-lexp (-id-path y)))
+           -Int)]
+   [(dep-> ([x : -Int]
+            [y : -Int])
+           #:pre (-leq (-lexp (-id-path x))
+                       (-lexp (-id-path y)))
+           -Int)
+    (dep-> ([x : -Int]
+            [y : -Int])
+           #:pre (-lt (-lexp (-id-path x))
+                      (-lexp (-id-path y)))
+           -Int)]
+   [FAIL
+    (dep-> ([x : -Int]
+            [y : -Int])
+           #:pre (-lt (-lexp (-id-path x))
+                      (-lexp (-id-path y)))
+           -Int)
+    (dep-> ([x : -Int]
+            [y : -Int])
+           #:pre (-leq (-lexp (-id-path x))
+                       (-lexp (-id-path y)))
+           -Int)]
+   [(dep-> ([x : -Int]
+            [y : (-refine/fresh n -Int
+                                (-leq (-lexp (-id-path x))
+                                      (-lexp (-id-path n))))])
+           -Int)
+    (dep-> ([x : -Int]
+            [y : -Int])
+           #:pre (-lt (-lexp (-id-path x))
+                      (-lexp (-id-path y)))
+           -Int)]
+   [(dep-> ([x : -Int]
+            [y : -Int])
+           #:pre (-leq (-lexp (-id-path x))
+                       (-lexp (-id-path y)))
+           -Int)
+    (dep-> ([x : -Int]
+            [y : (-refine/fresh n -Int
+                                (-lt (-lexp (-id-path x))
+                                     (-lexp (-id-path n))))])
+           -Int)]
+   [FAIL
+    (dep-> ([x : -Int]
+            [y : -Int])
+           #:pre (-lt (-lexp (-id-path x))
+                      (-lexp (-id-path y)))
+           -Int)
+    (dep-> ([x : -Int]
+            [y : (-refine/fresh n -Int
+                                (-leq (-lexp (-id-path x))
+                                      (-lexp (-id-path n))))])
+           -Int)]
+   [FAIL
+    (dep-> ([x : -Int]
+            [y : (-refine/fresh n -Int
+                                (-lt (-lexp (-id-path x))
+                                     (-lexp (-id-path n))))])
+           -Int)
+    (dep-> ([x : -Int]
+            [y : -Int])
+           #:pre (-leq (-lexp (-id-path x))
+                       (-lexp (-id-path y)))
+           -Int)]
    [(dep-> ([x : -Int]
             [y : (-refine/fresh n -Int
                                 (-leq (-lexp (-id-path n))
@@ -787,19 +869,21 @@
                                       (-lexp (-id-path x))))])
            -Int)]
    [(dep-> ([x : -Int]
-            [y : (-refine/fresh n -Int
-                                (-leq (-lexp (-id-path n))
-                                      (-lexp (-id-path x))))])
+            [y : -Int])
+           #:pre (-eq (-lexp (-id-path x))
+                      (-lexp (-id-path y)))
            (-refine/fresh res -Int
                           (-eq (-lexp (-id-path res))
-                               (-lexp (-id-path x)))))
+                               (-lexp (-id-path x)
+                                      (-id-path x)))))
     (dep-> ([x : -Int]
             [y : (-refine/fresh n -Int
                                 (-leq (-lexp (-id-path n))
                                       (-lexp (-id-path x))))])
            (-refine/fresh res -Int
-                          (-leq (-lexp (-id-path res))
-                                (-lexp (-id-path x)))))]
+                          (-eq (-lexp (-id-path res))
+                               (-lexp (-id-path x)
+                                      (-id-path y)))))]
    [FAIL
     (dep-> ([x : -Int]
             [y : (-refine/fresh n -Int
