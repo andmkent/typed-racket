@@ -661,10 +661,12 @@
      name]
     [(DepFun/pretty-ids: ids dom pre rng)
      (define (arg-id? id) (member id ids free-identifier=?))
-     (define pre-deps (filter arg-id? (free-ids pre)))
+     (define pre-deps (map name-ref->sexp
+                           (filter arg-id? (free-ids pre))))
      `(-> ,(for/list ([id (in-list ids)]
                       [d (in-list dom)])
-             (define deps (filter arg-id? (free-ids d)))
+             (define deps (map name-ref->sexp
+                               (filter arg-id? (free-ids d))))
              `(,(syntax-e id)
                :
                ,@(if (null? deps)
@@ -673,8 +675,8 @@
                ,(t->s d)))
           ,@(cond
               [(TrueProp? pre) '()]
-              [(null? pre-deps) `((#:pre ,(prop->sexp pre)))]
-              [else `((#:pre ,pre-deps ,(prop->sexp pre)))])
+              [(null? pre-deps) `(#:pre ,(prop->sexp pre))]
+              [else `(#:pre ,pre-deps ,(prop->sexp pre))])
           ,(values->sexp rng))]
     [else `(Unknown Type: ,(struct->vector type))]))
 

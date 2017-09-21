@@ -4148,7 +4148,7 @@
                  (define (== a b) 'yay)
                  (== x y))
                #:ret (ret Univ)
-               #:msg #rx"expected: .*given: Byte.*"]
+               #:msg #rx"unable to prove precondition"]
        [tc-err (let ()
                  (: safe-ref (-> ([v : (Vectorof Any)]
                                   [i : Natural])
@@ -4159,7 +4159,7 @@
                  (define (three-vals) (error 'bar))
                  (safe-ref (three-vals) (ann 3 (Refine [n : Natural] (= n 3)))))
                #:ret (ret Univ)
-               #:msg #rx"expected: .*given: .*"]
+               #:msg #rx"unable to prove precondition"]
        ;; polymorphic dependent function application
        [tc-e (let ()
                (: safe-ref (All (A) (-> ([v : (Vectorof A)]
@@ -4180,7 +4180,8 @@
                  (: three-syms (-> (Refine [v : (Vectorof Symbol)] (= 3 (vector-length v)))))
                  (define (three-syms) (error 'bar))
                  (safe-ref (three-syms) (ann 3 (Refine [n : Natural] (= n 3)))))
-             #:msg #rx"Polymorphic function `safe-ref' could not be applied"]
+               #:ret (ret -Symbol -true-propset -empty-obj)
+               #:msg #rx"unable to prove precondition"]
        [tc-e (let ()
                (: foo (-> VectorTop Byte))
                (define (foo vec)
