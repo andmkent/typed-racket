@@ -181,21 +181,25 @@
    ;;    original coefficient of p and added to the LExp
    ;; + for p's where (f p) = some Path, we just swap p and (f p) basically
    (define-values (new-const new-terms)
-     (for*/fold ([c const]
-                 [ts (make-terms)])
-                ([orig-x (in-terms-vars terms)]
-                 #:break (not c)
-                 [x (in-value (f orig-x))])
-       (match x
+     (for*/fold ([new-const const]
+                 [new-terms (make-terms)])
+                ([orig-var (in-terms-vars terms)]
+                 #:break (not new-const)
+                 [new-var (in-value (f orig-var))])
+       (match new-var
          ;; empty, this linear expression is kaputt
          [(Empty:) (values #f #f)]
-         [(? Path? x) (values c (terms-set ts x (terms-ref terms orig-x)))]
+         [(? Path? new-var)
+          (values new-const (terms-set new-terms
+                                       new-var
+                                       (+ (terms-ref new-terms new-var)
+                                          (terms-ref terms orig-var))))]
          ;; a linear expression -- scale it by
          ;; the old path's coeff and add it
-         [(LExp: new-const new-terms)
-          (define old-coeff (terms-ref terms orig-x))
-          (values (+ c (* old-coeff new-const))
-                  (terms-add ts (terms-scale new-terms old-coeff)))])))
+         [(LExp: var-const var-terms)
+          (define old-coeff (terms-ref terms orig-var))
+          (values (+ new-const (* old-coeff var-const))
+                  (terms-add new-terms (terms-scale var-terms old-coeff)))])))
    (if new-const
        (make-LExp* new-const new-terms)
        ;; if const is #f then some term(s) became Empty
