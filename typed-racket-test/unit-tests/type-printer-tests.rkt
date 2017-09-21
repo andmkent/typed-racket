@@ -210,6 +210,28 @@
                                  [`(Refine [,x : Integer] (= ,x 42)) #t]
                                  [`(Refine [,x : Integer] (= 42 ,x)) #t]
                                  [_ #f])))
+    (check-prints-as? (-refine/fresh x -Int (-eq (-lexp x) (-lexp (list 1 #'y) 42)))
+                      (λ (str) (match (read (open-input-string str))
+                                 [`(Refine [,x : Integer] (= ,x (+ y 42))) #t]
+                                 [`(Refine [,x : Integer] (= ,x (+ 42 y))) #t]
+                                 [_ #f])))
+    (check-prints-as? (-refine/fresh x -Int (-eq (-lexp x) (-lexp (list 1 #'y) 42)))
+                      (λ (str) (match (read (open-input-string str))
+                                 [`(Refine [,x : Integer] (= ,x (+ y 42))) #t]
+                                 [`(Refine [,x : Integer] (= (+ y 42) ,x)) #t]
+                                 [`(Refine [,x : Integer] (= ,x (+ 42 y))) #t]
+                                 [`(Refine [,x : Integer] (= (+ 42 y) ,x)) #t]
+                                 [_ #f])))
+    (check-prints-as? (-refine/fresh x -Int (-eq (-lexp x) (-lexp (list -1 #'y) 42)))
+                      (λ (str) (match (read (open-input-string str))
+                                 [`(Refine [,x : Integer] (= ,x (- 42 y))) #t]
+                                 [`(Refine [,x : Integer] (= (- 42 y) ,x)) #t]
+                                 [_ #f])))
+    (check-prints-as? (-refine/fresh x -Int (-eq (-lexp x) (-lexp (list 1 #'y) -42)))
+                      (λ (str) (match (read (open-input-string str))
+                                 [`(Refine [,x : Integer] (= ,x (- y 42))) #t]
+                                 [`(Refine [,x : Integer] (= (- y 42) ,x)) #t]
+                                 [_ #f])))
     (check-prints-as? (-refine/fresh x -Int (-is-type #'y -Int))
                       (λ (str) (match (read (open-input-string str))
                                  [`(Refine [,x : Integer] (: y Integer)) #t]

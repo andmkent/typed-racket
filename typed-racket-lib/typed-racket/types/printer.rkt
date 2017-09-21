@@ -197,6 +197,12 @@
      (cond
        [(terms-empty? terms) c]
        [else
+        (define (positive-term? t)
+          (match t
+            [(? number? n) (exact-positive-integer? n)]
+            [(list '* (? number? n) var) (exact-positive-integer? n)]
+            [(or (? symbol?) (? list?)) ;; obj w/ coeff 1
+             #t]))
         (define term-list
           (let ([terms (for/list ([(obj coeff) (in-terms terms)])
                          (if (= 1 coeff)
@@ -205,7 +211,33 @@
             (if (zero? c) terms (cons c terms))))
         (cond
           [(null? (cdr term-list)) (car term-list)]
-          [else (cons '+ term-list)])])]
+          [else
+           (define-values (pos-terms neg-terms) (partition positive-term? term-list))
+           (define (flip-sign term)
+             (match term
+               [(? number? n) (* -1 n)]
+               [(list '* (? number? n) obj)
+                (if (= -1 n)
+                    obj
+                    `(* ,(* -1 n) ,obj))]
+               [(or (? symbol? obj) (? list? obj)) ;; obj w/ coeff 1
+                (list '* -1 obj)]))
+           (cond
+             [(null? neg-terms) (cons '+ pos-terms)]
+             ;; if we have zero or one positive term t1,
+             ;; and the rest (-t2 -t3 etc) are negative,
+             ;; turn it into (- t1 t2 t3 ...) (where t1 may be omitted)
+             [(<= (length pos-terms) 1)
+              (append '(-)
+                      pos-terms
+                      (map flip-sign neg-terms))]
+             ;; otherwise we have some negative terms (-t1 -t2 ...)
+             ;; and two or more positive terms (t3 t4 ...),
+             ;; convert it into (- (+ t3 t4 ...) t1 t2 ...)
+             [else
+              (append '(-)
+                      (cons '+ pos-terms)
+                      (map flip-sign neg-terms))])])])]
     [else `(Unknown Object: ,(struct->vector object))]))
 
 ;; cover-union : Type LSet<Type> -> Listof<Symbol> Listof<Type>
