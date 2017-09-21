@@ -104,7 +104,7 @@
                [dom-t (in-list dom)])
            (parameterize ([current-orig-stx a])
              (check-below arg-res (ret dom-t))))
-         (unless (implies-in-env? -tt pre)
+         (unless (implies-in-env? (lexical-env) -tt pre)
            (tc-error/fields "could not apply function"
                             #:more "unable to prove precondition at application site"
                             "precondition" pre
@@ -229,7 +229,7 @@
            [maybe-substitution
             (define pre (subst-all maybe-substitution
                                    (subst-dom-objs argtys argobjs raw-pre)))
-            (unless (implies-in-env? -tt pre)
+            (unless (implies-in-env? (lexical-env) -tt pre)
               (tc-error/fields "could not apply function"
                                #:more "unable to prove precondition at application site"
                                "precondition" pre

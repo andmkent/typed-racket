@@ -571,12 +571,14 @@
    [(-> ([x : Integer]
          [y : Integer])
         (Refine [res : Integer] (<= res (+ x y))))
-    (make-DFun (list -Int -Int)
-               (-values
-                (-refine/fresh res -Int
-                               (-leq (-lexp (-id-path (cons 0 0)))
-                                     (-lexp (-id-path (cons 1 0))
-                                            (-id-path (cons 1 1)))))))]
+    (make-DepFun
+     (list -Int -Int)
+     -tt
+     (-values
+      (-refine/fresh res -Int
+                     (-leq (-lexp (-id-path (cons 0 0)))
+                           (-lexp (-id-path (cons 1 0))
+                                  (-id-path (cons 1 1)))))))]
    ;; simple dep latent props/object (no dep type, no DFun)
    [(-> ([x : Any])
         Boolean
@@ -606,11 +608,12 @@
    [(-> ([v : (Vectorof Any)]
          [i : (v) (Refine [n : Integer] (<= n (vector-length v)))])
         Any)
-    (make-DFun (list (-vec Univ)
-                     (-refine/fresh n -Int
-                                    (-leq (-lexp (-id-path n))
-                                          (-lexp (-vec-len-of (-id-path (cons 1 0)))))))
-               (-values Univ))]
+    (make-DepFun (list (-vec Univ)
+                       (-refine/fresh n -Int
+                                      (-leq (-lexp (-id-path n))
+                                            (-lexp (-vec-len-of (-id-path (cons 1 0)))))))
+                 -tt
+                 (-values Univ))]
    [(-> ([v : (Vectorof Any)]
          [i : (v) (Refine [n : Integer] (<= n (vector-length v)))])
         Any)
@@ -622,11 +625,12 @@
    [(-> ([i : (v) (Refine [n : Integer] (<= n (vector-length v)))]
          [v : (Vectorof Any)])
         Any)
-    (make-DFun (list (-refine/fresh n -Int
-                                    (-leq (-lexp (-id-path n))
-                                          (-lexp (-vec-len-of (-id-path (cons 1 1))))))
-                     (-vec Univ))
-               (-values Univ))]
+    (make-DepFun (list (-refine/fresh n -Int
+                                      (-leq (-lexp (-id-path n))
+                                            (-lexp (-vec-len-of (-id-path (cons 1 1))))))
+                       (-vec Univ))
+                 -tt
+                 (-values Univ))]
    [(-> ([x : Integer]
          [y : (z) (Refine [n : Integer] (<= n z))]
          [z : (x) (Refine [n : Integer] (<= n x))])
@@ -643,7 +647,7 @@
          [y : (z) (Refine [n : Integer] (<= n z))]
          [z : (x) (Refine [n : Integer] (<= n x))])
         Any)
-    (make-DFun
+    (make-DepFun
      (list -Int
            (-refine/fresh n -Int
                           (-leq (-lexp n)
@@ -651,13 +655,14 @@
            (-refine/fresh n -Int
                           (-leq (-lexp n)
                                 (-lexp (-id-path (cons 1 0))))))
+     -tt
      (-values Univ))]
    [(-> ([w : (y) (Refine [n : Integer] (<= n y))]
          [x : Integer]
          [y : (z x) (Refine [n : Integer] (<= n (+ x z)))]
          [z : (x) (Refine [n : Integer] (<= n x))])
         (Refine [n : Integer] (<= n (+ w x y z))))
-    (make-DFun
+    (make-DepFun
      (list (-refine/fresh n -Int (-leq (-lexp n) (-lexp (-id-path (cons 1 2)))))
            -Int
            (-refine/fresh n -Int (-leq (-lexp n)
@@ -665,6 +670,7 @@
                                               (-id-path (cons 1 3)))))
            (-refine/fresh n -Int (-leq (-lexp n)
                                        (-lexp (-id-path (cons 1 1))))))
+     -tt
      (-values
       (-refine/fresh n -Int (-leq (-lexp n)
                                   (-lexp (-id-path (cons 1 0))

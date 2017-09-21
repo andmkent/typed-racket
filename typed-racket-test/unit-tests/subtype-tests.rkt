@@ -725,33 +725,41 @@
 (define dependent-function-tests
   (subtyping-tests
    "Dependent Function Subtyping"
-   [(make-DFun (list -Int -Int)
-               (-values
-                (-refine/fresh res -Int
-                               (-eq (-lexp (-id-path (cons 0 0)))
-                                    (-lexp (-id-path (cons 1 0))
-                                           (-id-path (cons 1 1)))))))
+   [(make-DepFun
+     (list -Int -Int)
+     -tt
+     (-values
+      (-refine/fresh res -Int
+                     (-eq (-lexp (-id-path (cons 0 0)))
+                          (-lexp (-id-path (cons 1 0))
+                                 (-id-path (cons 1 1)))))))
     (-> -Int -Int -Int)]
-   [(make-DFun (list -Int -Int)
-               (-values
-                (-refine/fresh res -Int
-                               (-eq (-lexp (-id-path (cons 0 0)))
-                                    (-lexp (-id-path (cons 1 0))
-                                           (-id-path (cons 1 1)))))))
-    (make-DFun (list -Int -Int)
-               (-values
-                (-refine/fresh res -Int
-                               (-eq (-lexp (-id-path (cons 0 0)))
-                                    (-lexp (-id-path (cons 1 0))
-                                           (-id-path (cons 1 1)))))))]
+   [(make-DepFun
+     (list -Int -Int)
+     -tt
+     (-values
+      (-refine/fresh res -Int
+                     (-eq (-lexp (-id-path (cons 0 0)))
+                          (-lexp (-id-path (cons 1 0))
+                                 (-id-path (cons 1 1)))))))
+    (make-DepFun
+     (list -Int -Int)
+     -tt
+     (-values
+      (-refine/fresh res -Int
+                     (-eq (-lexp (-id-path (cons 0 0)))
+                          (-lexp (-id-path (cons 1 0))
+                                 (-id-path (cons 1 1)))))))]
    [FAIL
     (-> -Int -Int -Int)
-    (make-DFun (list -Int -Int)
-               (-values
-                (-refine/fresh res -Int
-                               (-eq (-lexp (-id-path (cons 0 0)))
-                                    (-lexp (-id-path (cons 1 0))
-                                           (-id-path (cons 1 1)))))))]
+    (make-DepFun
+     (list -Int -Int)
+     -tt
+     (-values
+      (-refine/fresh res -Int
+                     (-eq (-lexp (-id-path (cons 0 0)))
+                          (-lexp (-id-path (cons 1 0))
+                                 (-id-path (cons 1 1)))))))]
    [(-> -Int -Int -Int)
     (dep-> ([x : -Int]
             [y : (-refine/fresh n -Int

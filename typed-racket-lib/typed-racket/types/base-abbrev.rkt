@@ -266,24 +266,31 @@
 (define-syntax (dep-> stx)
   (syntax-parse stx
     [(_ ([x:id (~datum :) dom:expr] ...)
+        (~optional (~seq #:pre pre)
+                   #:defaults ([pre #'-tt]))
         rng:expr
-        (~datum :) props:expr
-        (~datum :) object:expr)
+        (~optional (~or (~seq (~datum :) props:expr)
+                        (~seq (~datum :) props:expr
+                              (~datum :) object:expr))
+                   #:defaults ([props #'-tt-propset]
+                               [object #'-empty-obj])))
      (with-syntax ([(d ...) (generate-temporaries #'(dom ...))]
                    [(d* ...) (generate-temporaries #'(dom ...))])
        (syntax/loc stx
          (let ([x (genid)] ...)
            (let ([ids (list x ...)]
                  [d dom] ...
+                 [p pre]
                  [r rng]
                  [ps props]
                  [o object])
              (let ([d* (abstract-obj d ids)] ...
+                   [p* (abstract-obj p ids)]
                    [r* (abstract-obj r ids)]
                    [ps* (abstract-obj ps ids)]
                    [o* (abstract-obj o ids)])
                (cond
-                 [(and (equal? d d*) ... (equal? r r*))
+                 [(and (equal? d d*) ... (equal? r r*) (TrueProp? p*))
                   ;; non-dependent (as in DFun) case!
                   (-Arrow (list d* ...)
                           (make-Values (list (-result r* ps* o*))))]
@@ -291,23 +298,18 @@
                  [else
                   (define (arg? id)
                     (member id ids free-identifier=?))
-                  (define deps (for/list ([id (in-list ids)]
-                                          [ty (in-list (list d ...))])
-                                 (cons id (filter arg? (free-ids ty)))))
-                  (define cycle (cycle-in-arg-deps? deps))
+                  (define dom-deps (for/list ([id (in-list ids)]
+                                              [ty (in-list (list d ...))])
+                                     (cons id (filter arg? (free-ids ty)))))
+                  (define cycle (cycle-in-arg-deps? dom-deps))
                   (cond
                     [cycle
                      (error 'dep-> "cyclic dependency: ~a" cycle)]
                     [else
-                     (make-DFun
+                     (make-DepFun
                       (list d* ...)
-                      (-values r* ps* o*))])]))))))]
-    [(_ dom rng (~datum :) props)
-     (syntax/loc stx
-       (dep-> dom rng : props : -empty-obj))]
-    [(_ dom rng)
-     (syntax/loc stx
-       (dep-> dom rng : -tt-propset : -empty-obj))]))
+                      p*
+                      (-values r* ps* o*))])]))))))]))
 
 
 ;; Convenient syntax for polymorphic types

@@ -722,7 +722,7 @@
                                      (subtypes*/varargs dom2 dom1 #f)
                                      (subval* rng1 rng2)))
 
-             (and (implies-in-env? pre1 pre2)
+             (and (implies-in-env? (lexical-env) pre1 pre2)
                   A*)))])]
      [(Fun: arrows2)
       (define arity (for/fold ([arity (length raw-dom1)])
@@ -757,7 +757,7 @@
                     (subval* A*
                              (instantiate-obj+simplify raw-rng1 mapping)
                              (instantiate-obj raw-rng2 ids)))
-                  (and (implies-in-env? -tt pre1)
+                  (and (implies-in-env? (lexical-env) -tt pre1)
                        A-res))])])))]
      [_ (continue<: A t1 t2 obj)])]
   [(case: Distinction (Distinction: nm1 id1 t1*))

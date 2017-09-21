@@ -732,12 +732,9 @@
         (channel/sc (t->sc t))]
        [(Evt: t)
         (evt/sc (t->sc t))]
-       [rep
-        (cond
-          [(Prop? rep)
-           (fail #:reason "contract generation not supported for this proposition")]
-          [else
-           (fail #:reason "contract generation not supported for this type")])]))))
+       [(? Prop? rep) (prop->sc rep)]
+       [_
+        (fail #:reason "contract generation not supported for this type")]))))
 
 
 (define (t->sc/function f fail typed-side recursive-values loop method?)
@@ -858,7 +855,7 @@
             (for/lists (_1 _2) ([d (in-list dom)])
               (values (t->sc/neg d)
                       (filter dom-id? (free-ids d)))))
-          (define pre* (t->sc/neg pre))
+          (define pre* (if (TrueProp? pre) #f (t->sc/neg pre)))
           (define pre-deps (filter dom-id? (free-ids pre)))
           (define rng* (map t->sc rngs))
           (define rng-deps (filter dom-id?
