@@ -205,7 +205,7 @@
       (Arrow: dom2 rst2 kws2 raw-rng2))
      (define A* (subtype-seq A
                              (rest-arg-subtype* rst1 rst2)
-                             (subtypes*/varargs dom2 dom1 rst1)
+                             (subtypes*/varargs dom2 dom1 rst1 #f)
                              (kw-subtypes* kws1 kws2)))
      (cond
        [(not A*) #f]
@@ -239,7 +239,7 @@
        (define pre2 (instantiate-obj raw-pre2 ids))
        (define A* (subtype-seq A
                                (rest-arg-subtype* rst1 #f)
-                               (subtypes*/varargs dom2 dom1 rst1)
+                               (subtypes*/varargs dom2 dom1 rst1 (map -id-path ids))
                                (kw-subtypes* kws1 '())))
        (cond
          [(not A*) #f]
@@ -279,22 +279,44 @@
     [(_ _) #f]))
 
 (define (subtypes/varargs args dom rst)
-  (and (subtypes*/varargs null args dom rst) #t))
+  (and (subtypes*/varargs null args dom rst #f) #t))
 
-(define (subtypes*/varargs A argtys dom rst)
-  (let loop-varargs ([dom dom] [argtys argtys] [A A])
+; subtypes*/varargs : list?
+;                     (listof Type)
+;                     (listof Type)
+;                     (or/c #f Type)
+;                     (or/c #f (listof Object))
+; ->
+; list? or #f
+(define (subtypes*/varargs A argtys dom rst argobjs)
+  (let loop-varargs ([dom dom]
+                     [argtys argtys]
+                     [argobjs argobjs]
+                     [A A])
     (cond
       [(not A) #f]
       [(and (null? dom) (null? argtys)) A]
       [(null? argtys) #f]
       [(and (null? dom) rst)
        (cond
-         [(subtype* A (car argtys) rst)
-          => (λ (A) (loop-varargs dom (cdr argtys) A))]
+         [(subtype* A
+                    (car argtys)
+                    rst
+                    (and argobjs (car argobjs)))
+          => (λ (A) (loop-varargs dom
+                                  (cdr argtys)
+                                  (and argobjs (cdr argobjs))
+                                  A))]
          [else #f])]
       [(null? dom) #f]
-      [(subtype* A (car argtys) (car dom))
-       => (λ (A) (loop-varargs (cdr dom) (cdr argtys) A))]
+      [(subtype* A
+                 (car argtys)
+                 (car dom)
+                 (and argobjs (car argobjs)))
+       => (λ (A) (loop-varargs (cdr dom)
+                               (cdr argtys)
+                               (and argobjs (cdr argobjs))
+                               A))]
       [else #f])))
 
 
@@ -718,11 +740,12 @@
                [#:identifiers ids
                 #:types dom2
                 #:props (list pre2)]
-             (define A* (subtype-seq A
-                                     (subtypes*/varargs dom2 dom1 #f)
-                                     (subval* rng1 rng2)))
+             (define A*
+               (subtype-seq A
+                            (subtypes*/varargs dom2 dom1 #f (map -id-path ids))
+                            (subval* rng1 rng2)))
 
-             (and (implies-in-env? (lexical-env) pre1 pre2)
+             (and (implies-in-env? (lexical-env) pre2 pre1)
                   A*)))])]
      [(Fun: arrows2)
       (define arity (for/fold ([arity (length raw-dom1)])
@@ -738,7 +761,7 @@
           (match a2
             [(Arrow: dom2 rst2 kws2 raw-rng2)
              (define A* (subtype-seq A
-                                     (subtypes*/varargs dom2 dom1 #f)
+                                     (subtypes*/varargs dom2 dom1 #f #f)
                                      (kw-subtypes* '() kws2)))
              (cond
                [(not A*) #f]

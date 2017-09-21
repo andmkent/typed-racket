@@ -187,6 +187,7 @@
     [_ #f]))
 
 
+;; extract-props : Object Type -> (values Type (listof Prop?))
 ;; given the fact that 'obj' is of type 'type',
 ;; look inside of type trying to learn
 ;; more info about obj

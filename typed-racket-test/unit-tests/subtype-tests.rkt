@@ -886,8 +886,8 @@
                                       (-id-path x)))))
     (dep-> ([x : -Int]
             [y : (-refine/fresh n -Int
-                                (-leq (-lexp (-id-path n))
-                                      (-lexp (-id-path x))))])
+                                (-eq (-lexp (-id-path n))
+                                     (-lexp (-id-path x))))])
            (-refine/fresh res -Int
                           (-eq (-lexp (-id-path res))
                                (-lexp (-id-path x)
