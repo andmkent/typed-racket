@@ -356,8 +356,8 @@
   (match t
     [(tc-result1: _ _ _) t]
     [_ (tc-error/expr
-          #:stx form
-          "expected single value, got multiple (or zero) values")]))
+        #:stx form
+        "expected single value, got multiple (or zero) values")]))
 
 
 ;; tc-body/check: syntax? tc-results? -> tc-results?

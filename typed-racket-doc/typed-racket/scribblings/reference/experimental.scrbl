@@ -149,13 +149,15 @@ dead code.
 Typed Racket supports explicitly dependent function types:
   
 @defform*/subs[#:link-target? #f #:id -> #:literals (:)
-               [(-> ([id : opt-deps type opt-where] ...) type opt-props)]
+               [(-> ([id : opt-deps arg-type] ...)
+                    opt-pre
+                    rang-type
+                    opt-props)]
                ([opt-deps (code:line) (id ...)]
-                [opt-where (code:line) (code:line #:where prop)]
+                [opt-pre (code:line)
+                 (code:line #:pre opt-deps prop)]
                 [opt-props (code:line)
-                 (code:line opt-pos-prop
-                            opt-neg-prop
-                            opt-obj)]
+                 (code:line opt-pos-prop opt-neg-prop opt-obj)]
                 [opt-pos-prop (code:line)
                  (code:line #:+ prop)]
                 [opt-neg-prop (code:line)
@@ -164,36 +166,54 @@ Typed Racket supports explicitly dependent function types:
                  (code:line #:object obj)])]
 
 
-The syntax is partially borrowed from Racket's dependent
-contracts (i.e. @racket[->i]).
+The syntax is similar to Racket's dependent contracts syntax
+(i.e. @racket[->i]).
 
 Each function argument has a name, an optional list of
-identifiers it depends on, an argument type, and an optional
-@racket[#:where] clause that can refine the type. An
+identifiers it depends on, an argument type. An
 argument's type can mention (i.e. depend on) other arguments
 by name if they appear in its list of dependencies.
 Dependencies cannot be cyclic.
 
-A function's range may mention on any of its arguments.
+A function may have also have a precondition. The
+precondition is introduced with the @racket[#:pre] keyword
+followed by the list of arguments on which it depends.
 
-The syntax for @racket[prop] and @racket[obj] is the same as
-the syntax for @racket[proposition] @racket[symbolic-object] in
-the description of @racket[Refine]'s syntax.
+A function's range may depend on any of its arguments.
 
-For example, here is a stronger type for Racket's @racket[vector-ref]:
+The grammar of supported propositions and symbolic objects
+(i.e. @racket[prop] and @racket[obj]) is the same as
+the @racket[proposition] and @racket[symbolic-object] grammars
+from @racket[Refine]'s syntax.
+
+For example, here is a dependently typed version of
+Racket's @racket[vector-ref] which eliminates vector
+bounds errors during type checking instead of at run time:
 
 @ex[#:label #f
- (: safe-ref1 (All (A) (-> ([v : (Vectorof A)]
-                            [n : (v) Natural #:where (< n (vector-length v))])
-                           A)))
- (define (safe-ref1 v n) (vector-ref v n))]
+ (require racket/unsafe/ops)
 
-Here is an equivalent type that uses an explicit @racket[Refine] instead of
-a @racket[#:where] clause (i.e. @racket[#:where] is just syntactic sugar
-for an explicit @racket[Refine]):
+ (: safe-ref1 (All (A) (-> ([v : (Vectorof A)]
+                            [n : (v) (Refine [i : Natural]
+                                             (< i (vector-length v)))])
+                           A)))
+ (define (safe-ref1 v n) (unsafe-vector-ref v n))
+ (safe-ref1 (vector "safe!") 0)
+ (eval:error (safe-ref1 (vector "not safe!") 1))]
+
+Here is an equivalent type that uses a precondition instead of a
+refinement type:
 
 @ex[#:label #f
  (: safe-ref2 (All (A) (-> ([v : (Vectorof A)]
-                            [n : (v) (Refine [i : Natural] (< i (vector-length v)))])
+                            [n : Natural])
+                           #:pre (v n) (< n (vector-length v))
                            A)))
- (define (safe-ref2 v n) (vector-ref v n))]
+ (define (safe-ref2 v n) (unsafe-vector-ref v n))
+ (safe-ref2 (vector "safe!") 0)
+ (eval:error (safe-ref2 (vector "not safe!") 1))]
+
+Using preconditions can provide more detailed type checker
+error messages, i.e. they can indicate when the arguments
+were of the correct type but the precondition could not
+be proven.

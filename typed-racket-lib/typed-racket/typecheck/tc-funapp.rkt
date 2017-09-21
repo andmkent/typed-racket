@@ -80,36 +80,37 @@
        #:when (not (RestDots? (Arrow-rst arrow)))
        (tc/funapp1 f-stx args-stx arrow args-res expected)]
       [(DepFun: raw-dom raw-pre raw-rng)
-       (define subst (for/list ([o (in-list argobjs)]
-                                [t (in-list argtys)]
-                                [idx (in-naturals)])
-                       (list* idx o t)))
-       (define dom (for/list ([t (in-list raw-dom)])
-                     (instantiate-obj+simplify t subst)))
-       (define pre (instantiate-obj+simplify raw-pre subst))
-       (define rng (values->tc-results/explicit-subst raw-rng subst))
-       (with-lexical-env+props-simple
-           arg-props
-         #:absurd (if expected
-                      (fix-results expected)
-                      (ret -Bottom))
-         (unless (= (length dom) (length args-res))
-           (tc-error/fields "could not apply function"
-                            #:more "wrong number of arguments provided"
-                            "expected" (length dom)
-                            "given" (length args-res)
-                            #:delayed? #t))
-         (for ([a (in-syntax args-stx)]
-               [arg-res (in-list args-res)]
-               [dom-t (in-list dom)])
-           (parameterize ([current-orig-stx a])
-             (check-below arg-res (ret dom-t))))
-         (unless (implies-in-env? (lexical-env) -tt pre)
-           (tc-error/fields "could not apply function"
-                            #:more "unable to prove precondition"
-                            "precondition" pre
-                            #:delayed? #t))
-         rng)]
+       (parameterize ([with-refinements? #t])
+         (define subst (for/list ([o (in-list argobjs)]
+                                  [t (in-list argtys)]
+                                  [idx (in-naturals)])
+                         (list* idx o t)))
+         (define dom (for/list ([t (in-list raw-dom)])
+                       (instantiate-obj+simplify t subst)))
+         (define pre (instantiate-obj+simplify raw-pre subst))
+         (define rng (values->tc-results/explicit-subst raw-rng subst))
+         (with-lexical-env+props-simple
+             arg-props
+           #:absurd (if expected
+                        (fix-results expected)
+                        (ret -Bottom))
+           (unless (= (length dom) (length args-res))
+             (tc-error/fields "could not apply function"
+                              #:more "wrong number of arguments provided"
+                              "expected" (length dom)
+                              "given" (length args-res)
+                              #:delayed? #t))
+           (for ([a (in-syntax args-stx)]
+                 [arg-res (in-list args-res)]
+                 [dom-t (in-list dom)])
+             (parameterize ([current-orig-stx a])
+               (check-below arg-res (ret dom-t))))
+           (unless (implies-in-env? (lexical-env) -tt pre)
+             (tc-error/fields "could not apply function"
+                              #:more "unable to prove precondition"
+                              "precondition" pre
+                              #:delayed? #t))
+           rng))]
       [(Fun: arrows)
        ;; check there are no RestDots
        #:when (not (for/or ([a (in-list arrows)])
@@ -211,36 +212,37 @@
          #:expected expected)]
       ;; polymorphic dependent function
       [(Poly: vars (DepFun: raw-dom raw-pre raw-rng))
-       (define dom (for/list ([d (in-list raw-dom)])
-                     (subst-dom-objs argtys argobjs d)))
-       (define rng (subst-dom-objs argtys argobjs raw-rng))
-       (with-lexical-env+props-simple
-           arg-props
-         #:absurd (if expected
-                      (fix-results expected)
-                      (ret -Bottom))
-         (define maybe-substitution
-           (extend-tvars vars
-                         (infer/vararg vars null argtys dom #f rng
-                                       (and expected
-                                            (tc-results->values expected))
-                                       #:objs argobjs)))
-         (cond
-           [maybe-substitution
-            (define pre (subst-all maybe-substitution
-                                   (subst-dom-objs argtys argobjs raw-pre)))
-            (unless (implies-in-env? (lexical-env) -tt pre)
-              (tc-error/fields "could not apply function"
-                               #:more "unable to prove precondition"
-                               "precondition" pre
-                               #:delayed? #t))
-            (values->tc-results/explicit-subst
-             (subst-all maybe-substitution rng)
-             '())]
-           [else
-            (poly-fail f-stx args-stx f-type args-res
-                       #:name (and (identifier? f-stx) f-stx)
-                       #:expected expected)]))]
+       (parameterize ([with-refinements? #t])
+         (define dom (for/list ([d (in-list raw-dom)])
+                       (subst-dom-objs argtys argobjs d)))
+         (define rng (subst-dom-objs argtys argobjs raw-rng))
+         (with-lexical-env+props-simple
+             arg-props
+           #:absurd (if expected
+                        (fix-results expected)
+                        (ret -Bottom))
+           (define maybe-substitution
+             (extend-tvars vars
+                           (infer/vararg vars null argtys dom #f rng
+                                         (and expected
+                                              (tc-results->values expected))
+                                         #:objs argobjs)))
+           (cond
+             [maybe-substitution
+              (define pre (subst-all maybe-substitution
+                                     (subst-dom-objs argtys argobjs raw-pre)))
+              (unless (implies-in-env? (lexical-env) -tt pre)
+                (tc-error/fields "could not apply function"
+                                 #:more "unable to prove precondition"
+                                 "precondition" pre
+                                 #:delayed? #t))
+              (values->tc-results/explicit-subst
+               (subst-all maybe-substitution rng)
+               '())]
+             [else
+              (poly-fail f-stx args-stx f-type args-res
+                         #:name (and (identifier? f-stx) f-stx)
+                         #:expected expected)])))]
       ;; Row polymorphism. For now we do really dumb inference that only works
       ;; in very restricted cases, but is probably enough for most cases in
       ;; the Racket codebase. Eventually this should be extended.
