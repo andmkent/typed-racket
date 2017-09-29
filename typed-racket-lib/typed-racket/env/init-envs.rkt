@@ -160,15 +160,20 @@
      `(make-Immutable-HashTable ,(type->sexp key) ,(type->sexp val))]
     [(Weak-HashTable: key val)
      `(make-Weak-HashTable ,(type->sexp key) ,(type->sexp val))]
-    [(Fun: (list (Arrow: dom #f '()
+    [(Fun: (list (Arrow: mand
+                         dom
+                         #f '()
                          (Values:
                           (list
                            (Result: t
                                     (PropSet: (TrueProp:)
                                               (TrueProp:))
                                     (Empty:)))))))
+     #:when (= mand (length dom))
      `(simple-> (list ,@(map type->sexp dom)) ,(type->sexp t))]
-    [(Fun: (list (Arrow: dom #f'()
+    [(Fun: (list (Arrow: mand
+                         dom
+                         #f '()
                          (Values:
                           (list
                            (Result: t
@@ -176,11 +181,12 @@
                                      (TypeProp: pth ft)
                                      (NotTypeProp: pth ft))
                                     (Empty:)))))))
+     #:when (= mand (length dom))
      `(make-pred-ty (list ,@(map type->sexp dom))
                     ,(type->sexp t)
                     ,(type->sexp ft)
                     ,(object->sexp pth))]
-    [(Fun: (list (Arrow: dom #f '()
+    [(Fun: (list (Arrow: mand dom #f '()
                          (Values:
                           (list
                            (Result: t
@@ -190,19 +196,10 @@
                                      (TypeProp: (Path: pth (cons 0 0))
                                                 (== -False)))
                                     (Path: pth (cons 0 0))))))))
+     #:when (= mand (length dom))
      `(->acc (list ,@(map type->sexp dom))
              ,(type->sexp t)
              (list ,@(map path-elem->sexp pth)))]
-    [(Fun: (? has-optional-args? arrs))
-     (match-define (Arrow: fdoms rest *kws rng) (first arrs))
-     (match-define (Arrow: ldoms _ _ _) (last arrs))
-     (define opts (drop ldoms (length fdoms)))
-     (define kws (map type->sexp *kws))
-     `(opt-fn (list ,@(map type->sexp fdoms))
-              (list ,@(map type->sexp opts))
-              ,(type->sexp rng)
-              ,@(if rest `(#:rest ,rest) '())
-              ,@(if (null? kws) '() `(#:kws (list ,@kws))))]
     [(Fun: arrs) `(make-Fun (list ,@(map type->sexp arrs)))]
     [(DepFun: dom pre rng)
      `(make-DepFun (list ,@(map type->sexp dom))
@@ -309,17 +306,21 @@
                  (list ,@(map type->sexp exports))
                  (list ,@(map type->sexp init-depends))
                  ,(type->sexp result))]
-    [(Arrow: dom #f '()
-             (Values: (list (Result: t (PropSet: (TrueProp:)
-                                                 (TrueProp:))
+    [(Arrow: mand dom #f '()
+             (Values: (list (Result: rng-t
+                                     (PropSet: (TrueProp:)
+                                               (TrueProp:))
                                      (Empty:)))))
+     #:when (= mand (length dom))
      `(-Arrow (list ,@(map type->sexp dom))
-              ,(type->sexp t))]
-    [(Arrow: dom #f '() rng)
+              ,(type->sexp rng-t))]
+    [(Arrow: mand dom #f '() rng)
+     #:when (= mand (length dom))
      `(-Arrow (list ,@(map type->sexp dom))
               ,(type->sexp rng))]
-    [(Arrow: dom rest kws rng)
+    [(Arrow: mand dom rest kws rng)
      `(make-Arrow
+       ,mand
        (list ,@(map type->sexp dom))
        ,(and rest (type->sexp rest))
        (list ,@(map type->sexp kws))

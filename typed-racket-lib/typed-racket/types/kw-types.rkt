@@ -184,7 +184,7 @@
   (define mand-non-kw-argc (- non-kw-argc (* 2 opt-non-kw-argc)))
   (match ft
     [(Fun: arrs)
-     (cond [(= (length arrs) 1) ; no optional args (either kw or not)
+     (cond [(= (length arrs) 1) ; no optional kw args
             (match-define (Arrow: doms _ _ rng) (car arrs))
             (define kw-length
               (- (length doms) (+ non-kw-argc (if rest? 1 0))))
@@ -266,11 +266,11 @@
 
 ;; compute-kws : (Listof Keyword) (Listof Keyword) (Listof Type)
 ;;               -> (Listof make-Keyword)
-;; Computes the keyword types for an arr in kw-unconvert
+;; Computes the keyword types for an Arrow in kw-unconvert
 ;;
 ;; assumptions: (1) in kw-args, there are two types per optional kw
 ;;                  and the first type is the argument type (which is
-;;                  the same in every `arr` in the function type)
+;;                  the same in every `Arrow` in the function type)
 ;;              (2) kw-args and keywords are sorted by keyword<? order
 (define (compute-kws mand-keywords keywords kw-args)
   (let loop ([kw-args kw-args]

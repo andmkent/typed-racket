@@ -524,7 +524,8 @@
   [#:for-each (f) (f ty)])
 
 
-(def-rep Arrow ([dom (listof Type?)]
+(def-rep Arrow ([mand exact-nonnegative-integer?]
+                [dom (listof Type?)] ;; includes optional args @ the end
                 [rst (or/c #f Type? RestDots?)]
                 [kws (and/c (listof Keyword?) keyword-sorted/c)]
                 [rng SomeValues?])
@@ -539,7 +540,8 @@
               (flip-variances (f kw)))
             (for/list ([d (in-list dom)])
               (flip-variances (f d))))))]
-  [#:fmap (f) (make-Arrow (map f dom)
+  [#:fmap (f) (make-Arrow mand
+                          (map f dom)
                           (and rst (f rst))
                           (map f kws)
                           (f rng))]
@@ -1364,8 +1366,9 @@
     (match rep
       ;; Functions
       ;; increment the level of the substituted object
-      [(Arrow: dom rst kws rng)
-       (make-Arrow (map rec dom)
+      [(Arrow: mand dom rst kws rng)
+       (make-Arrow mand
+                   (map rec dom)
                    (and rst (rec rst))
                    (map rec kws)
                    (rec/inc rng))]

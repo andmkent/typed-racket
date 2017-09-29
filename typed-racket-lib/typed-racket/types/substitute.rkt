@@ -91,9 +91,10 @@
                  (for/list ([img (in-list images)])
                    (-result (substitute img name expanded))))))])]
          [else (make-ValuesDots (map sub types) (sub dty) dbound)])]
-      [(Arrow: dom (RestDots: dty dbound) kws rng)
+      [(Arrow: mand dom (RestDots: dty dbound) kws rng)
        #:when (eq? name dbound)
        (make-Arrow
+        mand
         (append
          (map sub dom)
          ;; We need to recur first, just to expand out any dotted usages of this.
@@ -123,9 +124,10 @@
         (if (eq? name dbound) pre-image null)
         (make-ListDots (sub dty)
                        (if (eq? name dbound) image-bound dbound)))]
-      [(Arrow: dom (RestDots: dty dbound) kws rng)
+      [(Arrow: mand dom (RestDots: dty dbound) kws rng)
        #:when (eq? name dbound)
        (make-Arrow
+        mand
         (append (map sub dom) pre-image)
         (make-RestDots
          (substitute image dbound (sub dty))

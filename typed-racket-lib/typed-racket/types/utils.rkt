@@ -63,43 +63,8 @@
 (define-struct poly (name vars) #:prefab)
 (define current-poly-struct (make-parameter #f))
 
-;; UNUSED
-;; a table indicating what variables should be abstracted away before using
-;; this expected type keyed on the numeric Rep sequence
-(define to-be-abstr
-  (make-weak-hash))
 
-(provide to-be-abstr)
 
-;; has-optional-args? : (Listof arr) -> Boolean
-;; Check if the given arrs meet the necessary conditions to be printed
-;; with a ->* constructor or for generating a ->* contract
-(define (has-optional-args? arrows)
-  (and (> (length arrows) 1)
-       ;; No polydots
-       (not (ormap (λ (a) (RestDots? (Arrow-rst a))) arrows))
-       ;; Keyword args, range and rest specs all the same.
-       (match-let ([(cons (Arrow: _ rst1 kws1 rng1) as) arrows])
-         (for/and ([a (in-list as)])
-           (match a
-             [(Arrow: _ rst2 kws2 rng2)
-              (and (equal? rst1 rst2)
-                   (equal? kws1 kws2)
-                   (equal? rng1 rng2))])))
-       ;; Positionals are monotonically increasing by at most one.
-       (let-values ([(_ ok?)
-                     (for/fold ([positionals (Arrow-dom (first arrows))]
-                                [ok?  #t])
-                               ([arr (in-list (rest arrows))]
-                                #:break (not ok?))
-                       (define dom (Arrow-dom arr))
-                       (define ldom (length dom))
-                       (define lpositionals (length positionals))
-                       (values dom
-                               (and (or (= ldom lpositionals)
-                                        (= ldom (add1 lpositionals)))
-                                    (equal? positionals (take dom lpositionals)))))])
-         ok?)))
 
 (provide/cond-contract
  [instantiate-poly ((or/c Poly? PolyDots? PolyRow?) (listof Rep?)
@@ -110,6 +75,5 @@
  [fi (Rep? . -> . (listof symbol?))]
  [fv/list ((listof Rep?) . -> . (set/c symbol?))]
  [current-poly-struct (parameter/c (or/c #f poly?))]
- [has-optional-args? (-> (listof Arrow?) any)]
  )
 

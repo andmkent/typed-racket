@@ -123,6 +123,7 @@
 
 ;; Function types
 (define/cond-contract (-Arrow dom rng
+                              #:opt [opt '()]
                               #:rest [rst #f]
                               #:kws [kws null]
                               #:props [props -tt-propset]
@@ -133,7 +134,8 @@
           #:props PropSet?
           #:object OptObject?)
          Arrow?)
-  (make-Arrow dom
+  (make-Arrow (- (length dom) (length opt))
+              (append dom opt)
               rst
               (sort kws Keyword<?)
               (match rng
@@ -231,33 +233,26 @@
 (define-syntax (->optkey stx)
   (syntax-parse stx
     [(_ ty:expr ... [oty:expr ...] #:rest rst:expr (~seq k:keyword kty:expr opt:boolean) ... rng)
-     (let ([l (syntax->list #'(oty ...))])
-       (with-syntax ([((extra ...) ...)
-                      (for/list ([i (in-range (add1 (length l)))])
-                        (take l i))]
-                     [(rst ...) (for/list ([i (in-range (add1 (length l)))]) #'rst)])
-         (syntax/loc stx
-           (make-Fun
-            (list
-             (-Arrow (list ty ... extra ...)
-                     rng
-                     #:rest rst
-                     #:kws (sort (list (make-Keyword 'k kty opt) ...)
-                                 Keyword<?))
-             ...)))))]
+     (syntax/loc stx
+       (let ([mand-args (list ty ...)]
+             [opt-args (list oty ...)])
+         (make-Fun
+          (list
+           (-Arrow mand-args
+                   rng
+                   #:opt opt-args
+                   #:rest rst
+                   #:kws (sort (list (make-Keyword 'k kty opt) ...)
+                               Keyword<?))))))]
     [(_ ty:expr ... [oty:expr ...] (~seq k:keyword kty:expr opt:boolean) ... rng)
-     (let ([l (syntax->list #'(oty ...))])
-       (with-syntax ([((extra ...) ...)
-                      (for/list ([i (in-range (add1 (length l)))])
-                        (take l i))])
-         (syntax/loc stx
-           (make-Fun
-            (list
-             (-Arrow (list ty ... extra ...)
-                        rng
-                        #:kws (sort (list (make-Keyword 'k kty opt) ...)
-                                    Keyword<?))
-             ...)))))]))
+     (syntax/loc stx
+       (make-Fun
+        (list
+         (-Arrow (list ty ...)
+                 rng
+                 #:opt (list oty ...)
+                 #:kws (sort (list (make-Keyword 'k kty opt) ...)
+                             Keyword<?)))))]))
 
 (define (make-arr-dots dom rng dty dbound)
   (-Arrow dom rng #:rest (make-RestDots dty dbound)))
