@@ -194,14 +194,14 @@
              ,(type->sexp t)
              (list ,@(map path-elem->sexp pth)))]
     [(Fun: (? has-optional-args? arrs))
-     (match-define (Arrow: fdoms rest *kws rng) (first arrs))
-     (match-define (Arrow: ldoms _ _ _) (last arrs))
+     (match-define (Arrow: fdoms _ *kws rng) (first arrs))
+     (match-define (Arrow: ldoms rst _ _) (last arrs))
      (define opts (drop ldoms (length fdoms)))
      (define kws (map type->sexp *kws))
      `(opt-fn (list ,@(map type->sexp fdoms))
               (list ,@(map type->sexp opts))
               ,(type->sexp rng)
-              ,@(if rest `(#:rest ,rest) '())
+              ,@(if rst `(#:rest ,rst) '())
               ,@(if (null? kws) '() `(#:kws (list ,@kws))))]
     [(Fun: arrs) `(make-Fun (list ,@(map type->sexp arrs)))]
     [(DepFun: dom pre rng)
