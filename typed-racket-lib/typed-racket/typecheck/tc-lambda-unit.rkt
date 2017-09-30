@@ -64,7 +64,7 @@
 (define/cond-contract
   (tc-lambda-body arg-names arg-types #:rest-arg+type [rest-arg+type #f] #:expected [expected #f] body)
   (->* ((listof identifier?) (listof Type?) syntax?)
-       (#:rest (or/c #f (list/c identifier? (or/c Type? RestDots?)))
+       (#:rest-arg+type (or/c #f (cons/c identifier? (or/c Type? RestDots?)))
         #:expected (or/c #f tc-results/c))
        Arrow?)
 

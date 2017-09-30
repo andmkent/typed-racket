@@ -134,6 +134,8 @@
             ([arrow (in-list arity-sorted-arrows)])
     (cond
       [(for/or ([(arrow* min-arity) (in-assoc mand-arg-table)])
+         ;; is arrow like arrow* but arrow's max arity is 1 less
+         ;; than arrow*'s currently known min arity?
          (and (domain-is-prefix? arrow arrow* min-arity)
               (assoc-set mand-arg-table arrow* (sub1 min-arity))))]
       [else
