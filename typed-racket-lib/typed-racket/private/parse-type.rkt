@@ -287,7 +287,7 @@
            ;; does not need to be delayed since there's no parsing done
            #:attr result #'t))
 
-(define-splicing-syntax-class ->*-rest
+(define-splicing-syntax-class optional->*-rest
   #:description "rest argument type for ->*"
   #:attributes (type)
   (pattern (~optional (~seq #:rest type:non-keyword-ty))))
@@ -958,10 +958,32 @@
               (parse-type #'rng)
               : (-PS (attribute latent.positive) (attribute latent.negative))
               : (attribute latent.object)))]
+      ;; like ->* below but w/ a #:rest-pat present
       [(:->*^ (~var mand (->*-args #t))
               (~optional (~var opt (->*-args #f))
                          #:defaults ([opt.doms null] [opt.kws null]))
-              rest:->*-rest
+              #:rest-pat (hrest-types-stx:non-keyword-ty ...)
+              rng)
+       (with-arity (length (attribute mand.doms))
+         (define doms (for/list ([d (attribute mand.doms)])
+                        (parse-type d)))
+         (define opt-doms (for/list ([d (attribute opt.doms)])
+                            (parse-type d)))
+         (define hrest-tys (stx-map parse-type #'(hrest-types-stx ...)))
+         (cond
+           [(< (length hrest-tys) 2)
+            (parse-error
+             "heterogeneous rest specifications must include at least 2 types"
+             "given" (syntax->datum #'(hrest-types-stx ...)))]
+           [else
+            (opt-fn doms opt-doms (parse-values-type #'rng)
+                    #:rest (make-Rest hrest-tys)
+                    #:kws (map force (append (attribute mand.kws)
+                                             (attribute opt.kws))))]))]
+      [(:->*^ (~var mand (->*-args #t))
+              (~optional (~var opt (->*-args #f))
+                         #:defaults ([opt.doms null] [opt.kws null]))
+              rest:optional->*-rest
               rng)
        (with-arity (length (attribute mand.doms))
          (define doms (for/list ([d (attribute mand.doms)])
@@ -970,7 +992,7 @@
                             (parse-type d)))
          (opt-fn doms opt-doms (parse-values-type #'rng)
                  #:rest (and (attribute rest.type)
-                             (parse-type (attribute rest.type)))
+                             (make-Rest (list (parse-type (attribute rest.type)))))
                  #:kws (map force (append (attribute mand.kws)
                                           (attribute opt.kws)))))]
       [:->^

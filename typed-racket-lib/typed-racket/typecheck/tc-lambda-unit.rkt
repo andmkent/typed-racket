@@ -85,7 +85,7 @@
 (define/cond-contract
   (tc-lambda-body arg-names arg-types #:rest-arg+type [rest-arg+type #f] #:expected [expected #f] body)
   (->* ((listof identifier?) (listof Type?) syntax?)
-       (#:rest-arg+type (or/c #f (cons/c identifier? (or/c Type? RestDots?)))
+       (#:rest-arg+type (or/c #f (cons/c identifier? (or/c Rest? RestDots?)))
         #:expected (or/c #f tc-results/c))
        Arrow?)
 
@@ -95,8 +95,8 @@
        (values id rst
                (cons id arg-names)
                (cons (match rst
-                       [(? Bottom?) -Null]
-                       [(? Type?) (-lst rst)]
+                       [(Rest: rst-ts) #:when (ormap Bottom? rst-ts) -Null]
+                       [(? Rest?) (Rest->Mu rst)]
                        [(RestDots: dty dbound)
                         (make-ListDots dty dbound)])
                      arg-types))]
@@ -117,28 +117,34 @@
 ;; rest-id: The identifier of the rest arg, or #f for no rest arg
 ;; body: The body of the lambda to typecheck.
 ;; arg-tys: The expected positional argument types.
-;; rst: #f, expected rest arg Type, or expected RestDots
+;; rst: #f, expected rest arg Rest, or expected RestDots
 ;; ret-ty: The expected type of the body of the lambda.
 (define/cond-contract (check-clause arg-list rest-id body arg-tys rst ret-ty)
   ((listof identifier?)
-   (or/c #f identifier?) syntax? (listof Type?) (or/c #f Type? RestDots?)
+   (or/c #f identifier?) syntax? (listof Type?) (or/c #f Rest? RestDots?)
    tc-results/c
    . -> .
    Arrow?)
   (let* ([arg-len (length arg-list)]
          [tys-len (length arg-tys)]
          [arg-types
-          (if (andmap type-annotation arg-list)
-              (get-types arg-list #:default Univ)
-              (cond
-                [(= arg-len tys-len) arg-tys]
-                [(< arg-len tys-len) (take arg-tys arg-len)]
-                [(> arg-len tys-len)
-                 (append arg-tys
-                         (map (if (Type? rst)
-                                  (λ _ rst)
-                                  (λ _ -Bottom))
-                              (drop arg-list tys-len)))]))])
+          (cond
+            [(andmap type-annotation arg-list)
+             (get-types arg-list #:default Univ)]
+            [else
+             (define arg-diff (- arg-len tys-len))
+             (cond
+               [(eqv? 0 arg-diff) arg-tys]
+               [(negative? arg-diff) (take arg-tys arg-len)]
+               [else
+                (define tail-tys (match rst
+                                   [(Rest: rst-tys)
+                                    (define rst-len (length rst-tys))
+                                    (for/list ([idx (in-range arg-diff)])
+                                      (list-ref rst-tys (remainder idx rst-len)))]
+                                   [_ (for/list ([_ (in-range arg-diff)])
+                                        -Bottom)]))
+                (append arg-tys tail-tys)])])])
 
     ;; Check that the number of formal arguments is valid for the expected type.
     ;; Thus it must be able to accept the number of arguments that the expected
@@ -157,17 +163,21 @@
          => (λ (b) (make-RestDots (extend-tvars (list b) (get-type rest-id #:default Univ))
                                   b))]
         [else
-         (define base-rest-type
+         (define rest-types
            (cond
-             [(type-annotation rest-id) (get-type rest-id #:default Univ)]
-             [(Type? rst) rst]
-             [(not rst) -Bottom]
-             [else Univ]))
-         (define extra-types
-           (if (<= arg-len tys-len)
-               (drop arg-tys arg-len)
-               null))
-         (apply Un base-rest-type extra-types)]))
+             [(type-annotation rest-id) (match (get-type rest-id #:default Univ)
+                                          [(? Type? t) (list t)]
+                                          [(Rest: ts) ts])]
+             [(Rest? rst) (Rest-tys rst)]
+             [(not rst) (list -Bottom)]
+             [else (list Univ)]))
+         (cond
+           [(<= arg-len tys-len)
+            (define extra-types (drop arg-tys arg-len))
+            (make-Rest (for/list ([rt (in-list rest-types)])
+                         (apply Un rt extra-types)))]
+           [else (make-Rest rest-types)])]))
+
     (tc-lambda-body arg-list arg-types
                     #:rest-arg+type (and rest-type (cons rest-id rest-type))
                     #:expected ret-ty
@@ -176,12 +186,22 @@
 ;; typecheck a single lambda, with argument list and body
 ;; drest-ty and drest-bound are both false or not false
 (define/cond-contract (tc/lambda-clause/check f body arg-tys ret-ty rst)
-  (-> formals? syntax? (listof Type?) (or/c tc-results/c #f) (or/c #f Type? RestDots?)
+  (-> formals?
+      syntax?
+      (listof Type?)
+      (or/c tc-results/c #f)
+      (or/c #f Rest? RestDots?)
       Arrow?)
-  (check-clause (formals-positional f) (formals-rest f) body arg-tys rst ret-ty))
+  (check-clause (formals-positional f)
+                (formals-rest f)
+                body
+                arg-tys
+                rst
+                ret-ty))
 
 ;; typecheck a single opt-lambda clause with argument list and body
-(define/cond-contract (tc/opt-lambda-clause arg-list body aux-table flag-table)
+(define/cond-contract
+  (tc/opt-lambda-clause arg-list body aux-table flag-table)
   (-> (listof identifier?) syntax? free-id-table? free-id-table?
       (listof Arrow?))
   ;; arg-types: Listof[Type?]
@@ -262,8 +282,10 @@
             (make-RestDots (extend-tvars (list bound) (get-type rest-id #:default Univ))
                            bound))]
          ;; Lambda with regular rest argument
-         [rest-id
-          (get-type rest-id #:default Univ)]
+         [rest-id (match (get-type rest-id #:default Univ)
+                    [(? Type? t) (make-Rest (list t))]
+                    [(? Rest? rst) rst]
+                    [(? RestDots? rst) rst])]
          ;; Lambda with no rest argument
          [else #f]))
      (cond 
@@ -374,7 +396,7 @@
               #:unless (in-arities? seen arrow)
               #:when (cond
                        [formals-rest?
-                        (or (Type? rst) (>= (length dom) pos-count))]
+                        (or (Rest? rst) (>= (length dom) pos-count))]
                        [rst (<= (length dom) pos-count)]
                        [else (= (length dom) pos-count)]))
     arrow))

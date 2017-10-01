@@ -47,8 +47,6 @@
     [(#%plain-app . (~var v (tc/app-special-cases expected)))
      ((attribute v.check))]))
 
-
-
 ;; TODO: handle drest, and props/objects
 (define (arrow-matches? arr args)
   (match arr
@@ -59,10 +57,7 @@
                                      (PropSet: (TrueProp:) (TrueProp:))
                                      (Empty:))
                             ...)))
-     (cond
-       [(< (length domain) (length args)) rst]
-       [(= (length domain) (length args)) #t]
-       [else #f])]
+     (dom+rst/args-arity-match? domain rst args)]
     [_ #f]))
 
 (define (has-props? arr)
@@ -108,14 +103,14 @@
           (define arg-types
             (for/list ([arg-stx (in-list args*)]
                        [arg-idx (in-naturals)])
-              (define dom-ty (list-ref/default (car doms)
-                                               arg-idx
-                                               (car rsts)))
+              (define dom-ty (dom+rst-ref (car doms) (car rsts) arg-idx
+                                          (λ () (int-err "impossible, arity was previously checked"))))
               (cond
-                [(for/and ([dom (in-list doms)]
-                           [rst (in-list rsts)])
+                [(for/and ([dom (in-list (cdr doms))]
+                           [rst (in-list (cdr rsts))])
                    (equal? dom-ty
-                           (list-ref/default dom arg-idx rst)))
+                           (dom+rst-ref dom rst arg-idx
+                                        (λ () (int-err "impossible, arity was previously checked")))))
                  (single-value arg-stx (ret dom-ty))]
                 [else (single-value arg-stx)])))
           (tc/funapp #'f #'args f-ty arg-types expected)]

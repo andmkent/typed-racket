@@ -4,6 +4,7 @@
          (rep type-rep rep-utils)
          (utils tc-utils)
          "substitute.rkt" "tc-result.rkt" "tc-error.rkt"
+         (except-in "base-abbrev.rkt" -> ->*)
          (rep free-variance) 
          racket/match
          racket/set
@@ -13,6 +14,40 @@
 
 (provide (all-from-out "tc-result.rkt" "tc-error.rkt"))
 
+;; given the list of domain types (dom)
+;; and the functions rest spec (rst),
+;; get the type for an argument at position idx,
+;; else return default if no such type exists
+;; where default is a procedure (i.e. a thunk
+;; to be called in tail position)
+;; or some other value (to be returned)
+(define (dom+rst-ref dom rst idx default)
+  (match dom
+    [(cons t ts)
+     (cond
+       [(eqv? 0 idx) t]
+       [else (dom+rst-ref ts rst (sub1 idx) default)])]
+    [_ (match rst
+         [(Rest: rst-ts) (list-ref rst-ts (remainder idx (length rst-ts)))]
+         [_ (if (procedure? default) (default) default)])]))
+
+;; check that with domain 'dom' and rest argument spec 'rst',
+;; we could possibly accept 'args' (arity-wise)
+(define (dom+rst/args-arity-match? dom rst args)
+  (define extra-arg-count (- (length args) (length dom)))
+  (cond
+    [(eqv? 0 extra-arg-count) #t]
+    [(< extra-arg-count 0) #f]
+    [else (match rst
+            [(Rest: (app length rst-count))
+             (eqv? 0 (remainder extra-arg-count rst-count))]
+            [_ #f])]))
+
+
+(define (Rest->Mu r)
+  (match r
+    [(Rest: (list t)) (-lst t)]
+    [(Rest: ts) (apply make-HeteroListof ts)]))
 
 (define (instantiate-poly t types)
   (match t
@@ -118,5 +153,10 @@
  [fv/list ((listof Rep?) . -> . (set/c symbol?))]
  [current-poly-struct (parameter/c (or/c #f poly?))]
  [has-optional-args? (-> (listof Arrow?) any)]
+ [Rest->Mu (-> Rest? Mu?)]
+ [dom+rst-ref (-> (listof Type?) (or/c #f Rest? RestDots?) exact-nonnegative-integer? any/c
+                  any/c)]
+ [dom+rst/args-arity-match? (-> (listof Type?) (or/c #f Rest? RestDots?) list?
+                                boolean?)]
  )
 

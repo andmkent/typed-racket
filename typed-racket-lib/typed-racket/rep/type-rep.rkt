@@ -508,6 +508,19 @@
       (= (length kws) 1)
       (equal? kws (sort kws Keyword<?))))
 
+;; a Rest argument description
+;; tys: the cycle describing the rest args
+;; e.g.
+;; tys = (list Number) means all provided rest args
+;;        must all be a Number (see `+')
+;; tys = (list A B) means the rest arguments must be
+;;       of even cardinality, and must be an A followed
+;;       by a B repeated (e.g. A B A B A B)
+;; etc
+(def-rep Rest ([tys (cons/c Type? (listof Type?))])
+  [#:frees (f) (combine-frees (map f tys))]
+  [#:fmap (f) (make-Rest (map f tys))]
+  [#:for-each (f) (for-each f tys)])
 
 (def-rep RestDots ([ty Type?]
                    [nm (or/c natural-number/c symbol?)])
@@ -525,7 +538,7 @@
 
 
 (def-rep Arrow ([dom (listof Type?)]
-                [rst (or/c #f Type? RestDots?)]
+                [rst (or/c #f Rest? RestDots?)]
                 [kws (and/c (listof Keyword?) keyword-sorted/c)]
                 [rng SomeValues?])
   [#:frees (f)

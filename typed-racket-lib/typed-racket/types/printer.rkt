@@ -300,7 +300,7 @@
 ;; Convert an arr (see type-rep.rkt) to its printable form
 (define (arr->sexp arr)
   (match arr
-    [(Arrow: dom rest kws rng)
+    [(Arrow: dom rst kws rng)
      (append
       (list '->)
       (map type->sexp dom)
@@ -314,8 +314,9 @@
            (if req?
                (format "~a ~a" k (type->sexp t))
                (format "[~a ~a]" k (type->sexp t)))]))
-      (match rest
-        [(? Type?) `(,(type->sexp rest) *)]
+      (match rst
+        [(Rest: (list rst-t)) `(,(type->sexp rst-t) *)]
+        [(Rest: rst-ts) `(#:rest-pat ,(map type->sexp rst-ts))]
         [(RestDots: dty dbound)
          `(,(type->sexp dty) ... ,dbound)]
         [_ null])
@@ -385,7 +386,10 @@
                  (for/list ([opt-kw (in-list opt-kws)])
                    (match-define (Keyword: k t _) opt-kw)
                    (list k (type->sexp t))))
-       ,@(if rst (list '#:rest (type->sexp rst)) null)
+       ,@(match rst
+           [#f null]
+           [(Rest: (list rst-t)) (list '#:rest (type->sexp rst-t))]
+           [(Rest: rst-ts) (list '#:hrest (map type->sexp rst-ts))])
        ,(values->sexp rng))]))
 
 ;; cover-case-lambda : (Listof arr) -> (Listof s-expression)

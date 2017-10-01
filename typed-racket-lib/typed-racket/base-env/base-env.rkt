@@ -923,21 +923,9 @@
 [hash-eqv? (-> -HashTableTop B)]
 [hash-equal? (-> -HashTableTop B)]
 [hash-weak? (asym-pred -HashTableTop B (-PS (-is-type 0 -Weak-HashTableTop) (-not-type 0 -Weak-HashTableTop)))]
-[hash (-poly (a b) (cl->* (-> (-Immutable-HT a b))
-                          (a b . -> . (-Immutable-HT a b))
-                          (a b a b . -> . (-Immutable-HT a b))
-                          (a b a b a b . -> . (-Immutable-HT a b))
-                          (a b a b a b a b . -> . (-Immutable-HT a b))))]
-[hasheqv (-poly (a b) (cl->* (-> (-Immutable-HT a b))
-                             (a b . -> . (-Immutable-HT a b))
-                             (a b a b . -> . (-Immutable-HT a b))
-                             (a b a b a b . -> . (-Immutable-HT a b))
-                             (a b a b a b a b . -> . (-Immutable-HT a b))))]
-[hasheq (-poly (a b) (cl->* (-> (-Immutable-HT a b))
-                            (a b . -> . (-Immutable-HT a b))
-                            (a b a b . -> . (-Immutable-HT a b))
-                            (a b a b a b . -> . (-Immutable-HT a b))
-                            (a b a b a b a b . -> . (-Immutable-HT a b))))]
+[hash (-poly (a b) (->* (list) (make-Rest (list a b)) (-Immutable-HT a b)))]
+[hasheqv (-poly (a b) (->* (list) (make-Rest (list a b)) (-Immutable-HT a b)))]
+[hasheq (-poly (a b) (->* (list) (make-Rest (list a b)) (-Immutable-HT a b)))]
 [make-hash (-poly (a b) (->opt [(-lst (-pair a b))] (-Mutable-HT a b)))]
 [make-hasheq (-poly (a b) (->opt [(-lst (-pair a b))] (-Mutable-HT a b)))]
 [make-hasheqv (-poly (a b) (->opt [(-lst (-pair a b))] (-Mutable-HT a b)))]

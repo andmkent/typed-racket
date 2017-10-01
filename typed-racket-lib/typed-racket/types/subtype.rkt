@@ -34,7 +34,10 @@
  [subval (-> SomeValues? SomeValues? boolean?)]
  [type-equiv? (-> Type? Type? boolean?)]
  [subtypes (-> (listof Type?) (listof Type?) boolean?)]
- [subtypes/varargs (-> (listof Type?) (listof Type?) (or/c Type? #f) boolean?)]
+ [subtypes/varargs (-> (listof Type?)
+                       (listof Type?)
+                       (or/c Type? Rest? #f)
+                       boolean?)]
  [unrelated-structs (-> Struct? Struct? boolean?)])
 
 
@@ -182,7 +185,9 @@
   (match* (rst1 rst2)
     [(_ #f) A]
     [(t t) A]
-    [((? Type? t1) (? Type? t2)) (subtype* A t2 t1)]
+    [((Rest: ts1) (Rest: ts2))
+     (and (= (length ts1) (length ts2))
+          (subtypes* A ts2 ts1))]
     [((RestDots: t1 dbound)
       (RestDots: t2 dbound))
      (subtype* A t2 t1)]
@@ -284,40 +289,25 @@
 ; subtypes*/varargs : list?
 ;                     (listof Type)
 ;                     (listof Type)
-;                     (or/c #f Type)
+;                     (or/c #f Type Rest)
 ;                     (or/c #f (listof Object))
 ; ->
 ; list? or #f
-(define (subtypes*/varargs A argtys dom rst argobjs)
-  (let loop-varargs ([dom dom]
-                     [argtys argtys]
-                     [argobjs argobjs]
-                     [A A])
-    (cond
-      [(not A) #f]
-      [(and (null? dom) (null? argtys)) A]
-      [(null? argtys) #f]
-      [(and (null? dom) rst)
-       (cond
-         [(subtype* A
-                    (car argtys)
-                    rst
-                    (and argobjs (car argobjs)))
-          => (λ (A) (loop-varargs dom
-                                  (cdr argtys)
-                                  (and argobjs (cdr argobjs))
-                                  A))]
-         [else #f])]
-      [(null? dom) #f]
-      [(subtype* A
-                 (car argtys)
-                 (car dom)
-                 (and argobjs (car argobjs)))
-       => (λ (A) (loop-varargs (cdr dom)
-                               (cdr argtys)
-                               (and argobjs (cdr argobjs))
-                               A))]
-      [else #f])))
+(define (subtypes*/varargs A argtys dom raw-rst argobjs)
+  (define rst (match raw-rst
+                [(? Type?) (make-Rest (list raw-rst))]
+                [_ raw-rst]))
+  (cond
+    [(not (dom+rst/args-arity-match? dom rst argtys)) #f]
+    [else
+     (for/fold ([A A])
+               ([arg-t (in-list argtys)]
+                [arg-o (in-list/rest (or argobjs '()) #f)]
+                [idx (in-naturals)]
+                #:break (not A))
+       (define dom-t (dom+rst-ref dom rst idx
+                                  (λ () (int-err (format "subtypes*/varargs: impossible - arity checked")))))
+       (subtype* A arg-t dom-t arg-o))]))
 
 
 ;;************************************************************
@@ -771,7 +761,8 @@
                   (for/lists (_1 _2)
                     ([idx (in-range arity)]
                      [id (in-list ids)]
-                     [t (in-list/rest dom2 (or rst2 Univ))])
+                     [maybe-t (in-list/rest dom2 #f)])
+                    (define t (dom+rst-ref dom2 rst2 idx Univ))
                     (values (list* idx id t) t)))
                 (with-naively-extended-lexical-env
                     [#:identifiers ids

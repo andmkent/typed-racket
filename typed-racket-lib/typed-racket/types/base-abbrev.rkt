@@ -46,6 +46,9 @@
 ;; Char type and List type (needed because of how sequences are checked in subtype)
 (define (make-Listof elem) (-mu list-rec (Un -Null (make-Pair elem list-rec))))
 (define (make-MListof elem) (-mu list-rec (Un -Null (make-MPair elem list-rec))))
+(define (make-HeteroListof elem . elems)
+  (define var (gensym 'hetero-var))
+  (make-Mu (abstract-type (Un -Null (apply -lst* #:tail var elem elems)) var)))
 
 ;; -Tuple Type is needed by substitute for ListDots
 (define -pair make-Pair)
@@ -128,13 +131,13 @@
                               #:props [props -tt-propset]
                               #:object [obj -empty-obj])
   (c:->* ((c:listof Type?) (c:or/c SomeValues? Type?))
-         (#:rest (c:or/c #f Type? RestDots?)
+         (#:rest (c:or/c #f Type? RestDots? Rest?)
           #:kws (c:listof Keyword?)
           #:props PropSet?
           #:object OptObject?)
          Arrow?)
   (make-Arrow dom
-              rst
+              (if (Type? rst) (make-Rest (list rst)) rst)
               (sort kws Keyword<?)
               (match rng
                 [(? SomeValues?) rng]

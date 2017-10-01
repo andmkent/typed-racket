@@ -29,6 +29,7 @@ at least theoretically.
  in-pair
  in-list/rest
  list-ref/default
+ repeat-list
  match*/no-order
  bind
  genid
@@ -247,6 +248,12 @@ at least theoretically.
 ;; pads out t to be as long as s
 (define (list-extend s t extra)
   (append t (build-list (max 0 (- (length s) (length t))) (lambda _ extra))))
+
+;; repeat l n times
+(define (repeat-list l n)
+  (for/fold ([acc '()])
+            ([_ (in-range n)])
+    (append l acc)))
 
 ;; does l1 end with l2?
 ;; e.g. (list 1 2 3) ends with (list 2 3)

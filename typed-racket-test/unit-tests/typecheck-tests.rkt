@@ -4353,6 +4353,19 @@
           (void))
         #:ret (ret -Void #f #f)
         #:msg #rx"type mismatch"]
+       [tc-e ((inst hash Number Symbol))
+             (-Immutable-HT -Number -Symbol)]
+       [tc-e ((inst hash Number String) 1 "a")
+             (-Immutable-HT -Number -String)]
+       [tc-e ((inst hash Number Symbol)
+              1 'a 2 'b 3 'c 4 'd 5 'e 6 'f 7 'g 8 'h 9 'i 10 'j)
+             (-Immutable-HT -Number -Symbol)]
+       [tc-e (hash)
+             (-Immutable-HT Univ Univ)]
+       [tc-e (hash (ann 1 Number) "a")
+             (-Immutable-HT -Number -String)]
+       [tc-e (hash 0 "a" 1 "b" 2 "c" 3 "d" 4 "e" 5 "f" 6 "g" 7 "h" 8 "i" 9 "j")
+             (-Immutable-HT -Byte -String)]
        )
 
   (test-suite

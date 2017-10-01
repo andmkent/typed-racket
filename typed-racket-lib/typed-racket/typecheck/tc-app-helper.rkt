@@ -21,27 +21,53 @@
   (add-typeof-expr f-stx (ret (make-Fun (list ftype0))))
   (match* (ftype0 argtys)
     ;; we check that all kw args are optional
-    [((Arrow: dom rest (list (Keyword: _ _ #f) ...) rng)
+    [((Arrow: dom rst (list (Keyword: _ _ #f) ...) rng)
       (list (tc-result1: t-a _ o-a) ...))
-     #:when (not (RestDots? rest))
+     #:when (not (RestDots? rst))
      
      (when check?
-       (cond [(and (not rest) (not (= (length dom) (length t-a))))
+       (define extra-arg-count (- (length t-a) (length dom)))
+       (cond [(and (not rst) (not (eqv? 0 extra-arg-count)))
               (tc-error/fields "could not apply function"
                                #:more "wrong number of arguments provided"
                                "expected" (length dom)
                                "given" (length t-a)
                                #:delayed? #t)]
-             [(and rest (< (length t-a) (length dom)))
+             [(and rst (negative? extra-arg-count))
               (tc-error/fields "could not apply function"
                                #:more "wrong number of arguments provided"
                                "expected at least" (length dom)
                                "given" (length t-a)
-                               #:delayed? #t)])
-       (for ([dom-t (if rest (in-list/rest dom rest) (in-list dom))]
-             [a (in-syntax args-stx)]
-             [arg-t (in-list t-a)])
-         (parameterize ([current-orig-stx a]) (check-below arg-t dom-t))))
+                               #:delayed? #t)]
+             [(and (Rest? rst)
+                   (positive? extra-arg-count)
+                   (not (eqv? 0 (remainder extra-arg-count (length (Rest-tys rst))))))
+              (cond
+                [(eqv? 2 (length (Rest-tys rst)))
+                 (tc-error/fields "could not apply function"
+                                  #:more "wrong number of rest arguments provided"
+                                  "expected an even number, given" extra-arg-count
+                                  #:delayed? #t)]
+                [else (tc-error/fields "could not apply function"
+                                       #:more "wrong number of rest arguments provided"
+                                       "expected a multiple of " (length (Rest-tys rst))
+                                       "given" extra-arg-count
+                                       #:delayed? #t)])])
+       (match rst
+         [(Rest: rst-ts)
+          (for ([dom-t (in-list/rest dom #f)]
+                [a (in-syntax args-stx)]
+                [arg-t (in-list t-a)]
+                [idx (in-naturals)])
+            (define expected (or dom-t (list-ref rst-ts (remainder idx (length rst-ts)))))
+            (parameterize ([current-orig-stx a])
+              (check-below arg-t expected)))]
+         [_
+          (for ([dom-t (in-list dom)]
+                [a (in-syntax args-stx)]
+                [arg-t (in-list t-a)])
+            (parameterize ([current-orig-stx a])
+              (check-below arg-t dom-t)))]))
      (let ([dom-count (length dom)])
        ;; Currently do nothing with rest args and keyword args
        ;; as there are no support for them in objects yet.
@@ -91,7 +117,7 @@
 ;; Generates error messages when operand types don't match operator domains.
 (provide/cond-contract
   [domain-mismatches
-   ((syntax? syntax? Type? (listof (listof Type?)) (listof (or/c #f Type? RestDots?))
+   ((syntax? syntax? Type? (listof (listof Type?)) (listof (or/c #f Rest? RestDots?))
      (listof SomeValues?) (listof tc-results?) (or/c #f Type?) any/c)
     (#:expected (or/c #f tc-results/c)
      #:return tc-results?

@@ -324,6 +324,8 @@
        ,(and rest (type->sexp rest))
        (list ,@(map type->sexp kws))
        ,(type->sexp rng))]
+    [(Rest: tys )
+     `(make-Rest (list ,@(map type->sexp tys)))]
     [(RestDots: ty db)
      `(make-RestDots ,(type->sexp ty)
                      (quote ,db))]
