@@ -4319,6 +4319,18 @@
           (void))
         #:ret (ret -Void #f #f)
         #:msg #rx"given: String"]
+       [tc-err
+        (let ()
+          (ann ((tr:case-lambda
+                 #:∀ (A)
+                 [([a : A])
+                  (ann a A)]
+                 [[rest : A *]
+                  (ann rest (Listof A))]) 1)
+               (Listof One))
+          (void))
+        #:ret (ret -Void #f #f)
+        #:msg #rx"type mismatch"]
        )
 
   (test-suite
