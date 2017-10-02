@@ -84,6 +84,9 @@
 ;; body: The body of the lambda to typecheck.
 (define/cond-contract
   (tc-lambda-body arg-names arg-types #:rest-arg+type [rest-arg+type #f] #:expected [expected #f] body)
+  ;; BOOKMARK -- TODO callers should pass the type of the rest-id, not the rst spec
+  ;; since they know more about if there are still positional args that are going to
+  ;; end up in the rst arg, etc
   (->* ((listof identifier?) (listof Type?) syntax?)
        (#:rest-arg+type (or/c #f (cons/c identifier? (or/c Rest? RestDots?)))
         #:expected (or/c #f tc-results/c))
@@ -127,24 +130,22 @@
    Arrow?)
   (let* ([arg-len (length arg-list)]
          [tys-len (length arg-tys)]
+         [arg-diff (- arg-len tys-len)]
          [arg-types
           (cond
             [(andmap type-annotation arg-list)
              (get-types arg-list #:default Univ)]
+            [(eqv? 0 arg-diff) arg-tys]
+            [(negative? arg-diff) (take arg-tys arg-len)]
             [else
-             (define arg-diff (- arg-len tys-len))
-             (cond
-               [(eqv? 0 arg-diff) arg-tys]
-               [(negative? arg-diff) (take arg-tys arg-len)]
-               [else
-                (define tail-tys (match rst
-                                   [(Rest: rst-tys)
-                                    (define rst-len (length rst-tys))
-                                    (for/list ([idx (in-range arg-diff)])
-                                      (list-ref rst-tys (remainder idx rst-len)))]
-                                   [_ (for/list ([_ (in-range arg-diff)])
-                                        -Bottom)]))
-                (append arg-tys tail-tys)])])])
+             (define tail-tys (match rst
+                                [(Rest: rst-tys)
+                                 (define rst-len (length rst-tys))
+                                 (for/list ([idx (in-range arg-diff)])
+                                   (list-ref rst-tys (remainder idx rst-len)))]
+                                [_ (for/list ([_ (in-range arg-diff)])
+                                     -Bottom)]))
+             (append arg-tys tail-tys)])])
 
     ;; Check that the number of formal arguments is valid for the expected type.
     ;; Thus it must be able to accept the number of arguments that the expected
