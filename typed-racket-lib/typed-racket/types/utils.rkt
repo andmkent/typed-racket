@@ -47,7 +47,7 @@
 (define (Rest->Mu r)
   (match r
     [(Rest: (list t)) (-lst t)]
-    [(Rest: ts) (apply make-HeteroListof ts)]))
+    [(Rest: ts) (apply make-CyclicListof ts)]))
 
 (define (instantiate-poly t types)
   (match t

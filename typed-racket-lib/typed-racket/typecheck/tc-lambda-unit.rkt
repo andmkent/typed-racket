@@ -84,6 +84,9 @@
 ;; body: The body of the lambda to typecheck.
 (define/cond-contract
   (tc-lambda-body arg-names arg-types #:rest-arg+type [rest-arg+type #f] #:expected [expected #f] body)
+  ;; BOOKMARK -- TODO callers should pass the type of the rest-id, not the rst spec
+  ;; since they know more about if there are still positional args that are going to
+  ;; end up in the rst arg, etc
   (->* ((listof identifier?) (listof Type?) syntax?)
        (#:rest-arg+type (or/c #f (cons/c identifier? (or/c Rest? RestDots?)))
         #:expected (or/c #f tc-results/c))
@@ -127,24 +130,22 @@
    Arrow?)
   (let* ([arg-len (length arg-list)]
          [tys-len (length arg-tys)]
+         [arg-diff (- arg-len tys-len)]
          [arg-types
           (cond
             [(andmap type-annotation arg-list)
              (get-types arg-list #:default Univ)]
+            [(eqv? 0 arg-diff) arg-tys]
+            [(negative? arg-diff) (take arg-tys arg-len)]
             [else
-             (define arg-diff (- arg-len tys-len))
-             (cond
-               [(eqv? 0 arg-diff) arg-tys]
-               [(negative? arg-diff) (take arg-tys arg-len)]
-               [else
-                (define tail-tys (match rst
-                                   [(Rest: rst-tys)
-                                    (define rst-len (length rst-tys))
-                                    (for/list ([idx (in-range arg-diff)])
-                                      (list-ref rst-tys (remainder idx rst-len)))]
-                                   [_ (for/list ([_ (in-range arg-diff)])
-                                        -Bottom)]))
-                (append arg-tys tail-tys)])])])
+             (define tail-tys (match rst
+                                [(Rest: rst-tys)
+                                 (define rst-len (length rst-tys))
+                                 (for/list ([idx (in-range arg-diff)])
+                                   (list-ref rst-tys (remainder idx rst-len)))]
+                                [_ (for/list ([_ (in-range arg-diff)])
+                                     -Bottom)]))
+             (append arg-tys tail-tys)])])
 
     ;; Check that the number of formal arguments is valid for the expected type.
     ;; Thus it must be able to accept the number of arguments that the expected
@@ -156,27 +157,36 @@
               (and (> arg-len tys-len) (not rst)))
       (tc-error/delayed (expected-str tys-len rst arg-len rest-id)))
     (define rest-type
-      (cond
-        [(not rest-id) #f]
-        [(RestDots? rst) rst]
-        [(dotted? rest-id)
-         => (λ (b) (make-RestDots (extend-tvars (list b) (get-type rest-id #:default Univ))
-                                  b))]
-        [else
-         (define rest-types
-           (cond
-             [(type-annotation rest-id) (match (get-type rest-id #:default Univ)
-                                          [(? Type? t) (list t)]
-                                          [(Rest: ts) ts])]
-             [(Rest? rst) (Rest-tys rst)]
-             [(not rst) (list -Bottom)]
-             [else (list Univ)]))
-         (cond
-           [(<= arg-len tys-len)
-            (define extra-types (drop arg-tys arg-len))
-            (make-Rest (for/list ([rt (in-list rest-types)])
-                         (apply Un rt extra-types)))]
-           [else (make-Rest rest-types)])]))
+      (let ([rst-dom
+             (cond
+               [(not rest-id) #f]
+               [(RestDots? rst) rst]
+               [(dotted? rest-id)
+                => (λ (b) (make-RestDots
+                           (extend-tvars (list b)
+                                         (get-type rest-id #:default Univ))
+                           b))]
+               [(type-annotation rest-id)
+                (match (get-type rest-id #:default Univ)
+                  [(? Type? t) (make-Rest (list t))]
+                  [(? Rest? rst) rst])]
+               [(not rst) (make-Rest (list -Bottom))]
+               [(Type? rst) (make-Rest (list rst))]
+               [(Rest? rst) rst]
+               [else (make-Rest (list Univ))])])
+        ;; >>>>>>>>>> BOOKMARK <<<<<<<<<
+        ;; so we should have defined rst-dom to be WHATEVER
+        ;; Rest arg (or RestDots) is right for this function,
+        ;; now we should convert that into the type of the actual
+        ;; identifier for the rest list that is used in the body
+        ;; (i.e. some subtype of (Listof Any) if it has a rest arg)
+        #;(cond
+          [(<= arg-len tys-len)
+           (define extra-types (drop arg-tys arg-len))
+           (make-Rest (for/list ([rt (in-list rest-types)])
+                        (apply Un rt extra-types)))]
+          [else (make-Rest rest-types)])
+        (error 'TODO)))
 
     (tc-lambda-body arg-list arg-types
                     #:rest-arg+type (and rest-type (cons rest-id rest-type))

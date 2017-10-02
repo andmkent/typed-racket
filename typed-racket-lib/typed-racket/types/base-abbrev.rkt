@@ -46,9 +46,12 @@
 ;; Char type and List type (needed because of how sequences are checked in subtype)
 (define (make-Listof elem) (-mu list-rec (Un -Null (make-Pair elem list-rec))))
 (define (make-MListof elem) (-mu list-rec (Un -Null (make-MPair elem list-rec))))
-(define (make-HeteroListof elem . elems)
-  (define var (gensym 'hetero-var))
-  (make-Mu (abstract-type (Un -Null (apply -lst* #:tail var elem elems)) var)))
+(define (make-CyclicListof elem . elems)
+  (define var (gensym 'α))
+  (make-Mu var (abstract-type (Un -Null (apply -lst* #:tail (make-F var)
+                                               elem
+                                               elems))
+                              var)))
 
 ;; -Tuple Type is needed by substitute for ListDots
 (define -pair make-Pair)
