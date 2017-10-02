@@ -157,27 +157,36 @@
               (and (> arg-len tys-len) (not rst)))
       (tc-error/delayed (expected-str tys-len rst arg-len rest-id)))
     (define rest-type
-      (cond
-        [(not rest-id) #f]
-        [(RestDots? rst) rst]
-        [(dotted? rest-id)
-         => (λ (b) (make-RestDots (extend-tvars (list b) (get-type rest-id #:default Univ))
-                                  b))]
-        [else
-         (define rest-types
-           (cond
-             [(type-annotation rest-id) (match (get-type rest-id #:default Univ)
-                                          [(? Type? t) (list t)]
-                                          [(Rest: ts) ts])]
-             [(Rest? rst) (Rest-tys rst)]
-             [(not rst) (list -Bottom)]
-             [else (list Univ)]))
-         (cond
-           [(<= arg-len tys-len)
-            (define extra-types (drop arg-tys arg-len))
-            (make-Rest (for/list ([rt (in-list rest-types)])
-                         (apply Un rt extra-types)))]
-           [else (make-Rest rest-types)])]))
+      (let ([rst-dom
+             (cond
+               [(not rest-id) #f]
+               [(RestDots? rst) rst]
+               [(dotted? rest-id)
+                => (λ (b) (make-RestDots
+                           (extend-tvars (list b)
+                                         (get-type rest-id #:default Univ))
+                           b))]
+               [(type-annotation rest-id)
+                (match (get-type rest-id #:default Univ)
+                  [(? Type? t) (make-Rest (list t))]
+                  [(? Rest? rst) rst])]
+               [(not rst) (make-Rest (list -Bottom))]
+               [(Type? rst) (make-Rest (list rst))]
+               [(Rest? rst) rst]
+               [else (make-Rest (list Univ))])])
+        ;; >>>>>>>>>> BOOKMARK <<<<<<<<<
+        ;; so we should have defined rst-dom to be WHATEVER
+        ;; Rest arg (or RestDots) is right for this function,
+        ;; now we should convert that into the type of the actual
+        ;; identifier for the rest list that is used in the body
+        ;; (i.e. some subtype of (Listof Any) if it has a rest arg)
+        #;(cond
+          [(<= arg-len tys-len)
+           (define extra-types (drop arg-tys arg-len))
+           (make-Rest (for/list ([rt (in-list rest-types)])
+                        (apply Un rt extra-types)))]
+          [else (make-Rest rest-types)])
+        (error 'TODO)))
 
     (tc-lambda-body arg-list arg-types
                     #:rest-arg+type (and rest-type (cons rest-id rest-type))
