@@ -124,21 +124,21 @@
    . -> .
    Arrow?)
   (let* ([arg-len (length arg-list)]
-         [tys-len (length arg-tys)]
-         [arg-diff (- arg-len tys-len)]
+         [arg-tys-len (length arg-tys)]
+         [extra-arg-count (- arg-len arg-tys-len)]
          [arg-types
           (cond
             [(andmap type-annotation arg-list)
              (get-types arg-list #:default Univ)]
-            [(eqv? 0 arg-diff) arg-tys]
-            [(negative? arg-diff) (take arg-tys arg-len)]
+            [(eqv? 0 extra-arg-count) arg-tys]
+            [(negative? extra-arg-count) (take arg-tys arg-len)]
             [else
              (define tail-tys (match rst
                                 [(Rest: rst-tys)
                                  (define rst-len (length rst-tys))
-                                 (for/list ([idx (in-range arg-diff)])
+                                 (for/list ([idx (in-range extra-arg-count)])
                                    (list-ref rst-tys (remainder idx rst-len)))]
-                                [_ (for/list ([_ (in-range arg-diff)])
+                                [_ (for/list ([_ (in-range extra-arg-count)])
                                      -Bottom)]))
              (append arg-tys tail-tys)])])
 
@@ -148,9 +148,9 @@
     ;; enough arguments, or if it requires too many arguments.
     ;; This allows a form like (lambda args body) to have the type (-> Symbol
     ;; Number) with out a rest arg.
-    (when (or (and (< arg-len tys-len) (not rest-id))
-              (and (> arg-len tys-len) (not rst)))
-      (tc-error/delayed (expected-str tys-len rst arg-len rest-id)))
+    (when (or (and (< arg-len arg-tys-len) (not rest-id))
+              (and (> arg-len arg-tys-len) (not rst)))
+      (tc-error/delayed (expected-str arg-tys-len rst arg-len rest-id)))
 
     ;; rest-body-type
     ;; the type the rest id has in the body of the function
@@ -167,24 +167,34 @@
                       (make-ListDots ty dbound)))]
         [else
          (define rest-types
-           (match (or (type-annotation rest-id) rst)
-             [#f (list -Bottom)]
-             [(? Type? t) (list t)]
-             [(Rest: rst-ts) rst-ts]
-             [_ (list Univ)]))
+           (cond
+             [(type-annotation rest-id) (list (get-type rest-id #:default Univ))]
+             [else
+              (match rst
+                [#f (list -Bottom)]
+                [(? Type? t) (list t)]
+                [(Rest: rst-ts) rst-ts]
+                [_ (list Univ)])]))
          (values (make-Rest rest-types)
-                 (cond
-                   [(= arg-len tys-len) (make-CyclicListof rest-types)]
-                   ;; some of the args are _in_ the rst arg (at the front)
-                   [(<= arg-len tys-len)
-                    (define extra-types (drop arg-tys arg-len))
-                    (-Tuple* extra-types (make-CyclicListof rest-types))]
-                   ;; there are args whose type came from the rst
-                   [else
-                    (-Tuple* (take-right rest-types
-                                         (remainder (- arg-len tys-len)
-                                                    (length rest-types)))
-                             (make-CyclicListof rest-types))]))]))
+                 )
+         (cond
+           [(= arg-len arg-tys-len)
+            (values (make-Rest rest-types)
+                    (make-CyclicListof rest-types))]
+           ;; some of the args are _in_ the rst arg...
+           [(<= arg-len arg-tys-len)
+            (define extra-types (drop arg-tys arg-len))
+            (define rst-type (apply Un (append extra-types rest-types)))
+            (values (make-Rest (list rst-type))
+                    (make-Listof rst-type))]
+           ;; there are args whose type came from the rst
+           [else
+            (define rest-remainder (drop rest-types
+                                         (remainder (- arg-len arg-tys-len)
+                                                    (length rest-types))))
+            (values (make-Rest rest-types)
+                    (-Tuple* rest-remainder
+                             (make-CyclicListof rest-types)))])]))
 
     (tc-lambda-body
      arg-list

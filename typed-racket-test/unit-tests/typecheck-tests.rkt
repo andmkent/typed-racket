@@ -4407,29 +4407,6 @@
              (-Immutable-HT -Number -String)]
        [tc-e (hash 0 "a" 1 "b" 2 "c" 3 "d" 4 "e" 5 "f" 6 "g" 7 "h" 8 "i" 9 "j")
              (-Immutable-HT -Byte -String)]
-       [tc-e
-        (let ([x : Number 0]
-              [y : Number 1])
-          (apply hash null)
-          (ann (apply hash null) (-Immutable-HT -Number -String))
-          (apply hash (ann 0 Number) (ann "0" String) null)
-          (ann (apply hash (ann 0 Number) (ann "0" String) null)
-               (-Immutable-HT -Number -String))
-          (apply hash (ann 0 Number) (ann "0" String) (list (ann 0 Number) y))
-          (ann (apply hash (ann 0 Number) (ann "0" String) (list (ann 0 Number) y))
-               (-Immutable-HT -Number -String))
-          (apply hash (ann 0 Number) (ann "0" String)
-                 (ann (list (ann 0 Number) y) (Rec x (U Null (Pair Number (Pair Number x))))))
-          (ann (apply hash (ann 0 Number) (ann "0" String)
-                      (ann (list (ann 0 Number) y) (Rec x (U Null (Pair Number (Pair Number x))))))
-               (-Immutable-HT -Number -String))
-          (apply hash (ann 0 Number) (ann "0" String) (ann 0 Number) (list y))
-          (ann (apply hash (ann 0 Number) (ann "0" String) (ann 0 Number) (list y))
-               (-Immutable-HT -Number -String))
-          (apply hash (ann 0 Number) (ann "0" String) (list (ann 0 Number) (ann "0" String) (ann 0 Number) y))
-          (ann (apply hash (ann 0 Number) (ann "0" String) (list (ann 0 Number) (ann "0" String) (ann 0 Number) y))
-               (-Immutable-HT -Number -String)))
-        (-Immutable-HT -Number -String)]
        [tc-err
         (let ()
           (apply hash (ann 0 Number) null)
@@ -4440,8 +4417,8 @@
         (let ()
           (apply hash (ann 0 Number) null)
           (void))
-        #:ret (ret -Void #f #f)
-        #:expected (-Immutable-HT -Number -String)
+        #:ret (ret (-Immutable-HT -Number -String) #f #f)
+        #:expected (ret (-Immutable-HT -Number -String) #f #f)
         #:msg #rx"Bad arguments to function"]
        [tc-err
         (let ()
@@ -4453,46 +4430,71 @@
         (let ()
           (apply hash (ann 0 Number) (ann null (Listof (U Number String))))
           (void))
-        #:ret (ret -Void #f #f)
-        #:expected (-Immutable-HT -Number -String)
+        #:ret (ret (-Immutable-HT -Number -String) #f #f)
+        #:expected (ret (-Immutable-HT -Number -String) #f #f)
         #:msg #rx"Bad arguments to function"]
        [tc-err
         (let ()
-          (apply hash (ann 0 Number) (ann "0" String) (list x))
+          (apply hash (ann 0 Number) (ann "0" String) (ann 0 Number))
           (void))
         #:ret (ret -Void #f #f)
         #:msg #rx"Bad arguments to function"]
        [tc-err
         (let ()
-          (apply hash (ann 0 Number) (ann "0" String) (ann 0 Number) (list (ann "0" String) x))
+          (apply hash
+                 (ann 0 Number)
+                 (ann "0" String)
+                 (ann 0 Number)
+                 (list (ann "0" String)
+                       (ann 0 Number)))
           (void))
         #:ret (ret -Void #f #f)
         #:msg #rx"Bad arguments to function"]
        [tc-err
         (let ()
-          (apply hash (ann 0 Number) (ann "0" String) (ann 0 Number) (list (ann "0" String) x))
+          (apply hash
+                 (ann 0 Number)
+                 (ann "0" String)
+                 (ann 0 Number)
+                 (list (ann "0" String)
+                       (ann 0 Number)))
           (void))
-        #:ret (ret -Void #f #f)
-        #:expected (-Immutable-HT -Number -String)
+        #:ret (ret (-Immutable-HT -Number -String) #f #f)
+        #:expected (ret (-Immutable-HT -Number -String) #f #f)
         #:msg #rx"Bad arguments to function"]
        [tc-err
         (let ()
-          (apply hash (ann 0 Number) (ann "0" String) (ann 0 Number) (ann (list y) (Listof Number)))
+          (apply hash
+                 (ann 0 Number)
+                 (ann "0" String)
+                 (ann 0 Number)
+                 (ann (list (ann 0 Number))
+                      (Listof Number)))
           (void))
         #:ret (ret -Void #f #f)
         #:msg #rx"Bad arguments to function"]
        [tc-err
         (let ()
-          (apply hash (ann 0 Number) (ann "0" String) (list (ann 0 Number) (ann "0" String) x))
+          (apply hash
+                 (ann 0 Number)
+                 (ann "0" String)
+                 (list (ann 0 Number)
+                       (ann "0" String)
+                       (ann 0 Number)))
           (void))
         #:ret (ret -Void #f #f)
         #:msg #rx"Bad arguments to function"]
        [tc-err
         (let ()
-          (apply hash (ann 0 Number) (ann "0" String) (list (ann 0 Number) (ann "0" String) x))
+          (apply hash
+                 (ann 0 Number)
+                 (ann "0" String)
+                 (list (ann 0 Number)
+                       (ann "0" String)
+                       (ann 0 Number)))
           (void))
-        #:ret (ret -Void #f #f)
-        #:expected (-Immutable-HT -Number -String)
+        #:ret (ret (-Immutable-HT -Number -String) #f #f)
+        #:expected (ret (-Immutable-HT -Number -String) #f #f)
         #:msg #rx"Bad arguments to function"]
        )
 
