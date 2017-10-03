@@ -189,9 +189,8 @@
                     (make-Listof rst-type))]
            ;; there are args whose type came from the rst
            [else
-            (define rest-remainder (drop rest-types
-                                         (remainder (- arg-len arg-tys-len)
-                                                    (length rest-types))))
+            (define rest-remainder (drop rest-types (remainder extra-arg-count
+                                                               (length rest-types))))
             (values (make-Rest rest-types)
                     (-Tuple* rest-remainder
                              (make-CyclicListof rest-types)))])]))
