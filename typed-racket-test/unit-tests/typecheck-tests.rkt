@@ -4236,6 +4236,26 @@
        [tc-e
         (let ()
           (ann
+           (case-lambda
+             [(w x y z . rst)
+              (ann rst (Rec x (U Null (Pairof Number (Pairof String x)))))
+              (+ w (string-length x) y (string-length z))
+              42]
+             [(w x y . rst)
+              (+ w (string-length x) (string-length (car rst)) y)
+              42]
+             [(w x . rst)
+              (ann rst (Rec x (U Null (Pairof Number (Pairof String x)))))
+              (+ w (string-length x))
+              42]
+             [(w . rst) (+ (string-length (car rst)) w)]
+             [rst (ann rst (Rec x (U Null (Pairof Number (Pairof String x))))) 42])
+           (->* () () #:rest-pat (Number String) Number))
+          (void))
+        -Void]
+       [tc-e
+        (let ()
+          (ann
            (case-lambda [(x str num . nums)
                          (+ x num (string-length str))]
                         [(x str . nums)

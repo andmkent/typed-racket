@@ -83,26 +83,21 @@
 ;; expected: The expected type of the body forms.
 ;; body: The body of the lambda to typecheck.
 (define/cond-contract
-  (tc-lambda-body arg-names arg-types #:rest-arg+type [rest-arg+type #f] #:expected [expected #f] body)
+  (tc-lambda-body arg-names arg-types
+                  #:rest-id+type+body-type [rest-id+type+body-type #f]
+                  #:expected [expected #f] body)
   ;; BOOKMARK -- TODO callers should pass the type of the rest-id, not the rst spec
   ;; since they know more about if there are still positional args that are going to
   ;; end up in the rst arg, etc
   (->* ((listof identifier?) (listof Type?) syntax?)
-       (#:rest-arg+type (or/c #f (cons/c identifier? (or/c Rest? RestDots?)))
+       (#:rest-id+type+body-type (or/c #f (cons/c identifier? Type?))
         #:expected (or/c #f tc-results/c))
        Arrow?)
 
   (define-values (rst-id rst-type names types)
-    (match rest-arg+type
-      [(cons id rst)
-       (values id rst
-               (cons id arg-names)
-               (cons (match rst
-                       [(Rest: rst-ts) #:when (ormap Bottom? rst-ts) -Null]
-                       [(? Rest?) (Rest->Mu rst)]
-                       [(RestDots: dty dbound)
-                        (make-ListDots dty dbound)])
-                     arg-types))]
+    (match rest-id+type+body-type
+      [(list id rst body-type)
+       (values id rst (cons id arg-names) (cons body-type arg-types))]
       [_ (values #f #f arg-names arg-types)]))
 
   (-Arrow
@@ -156,42 +151,47 @@
     (when (or (and (< arg-len tys-len) (not rest-id))
               (and (> arg-len tys-len) (not rst)))
       (tc-error/delayed (expected-str tys-len rst arg-len rest-id)))
-    (define rest-type
-      (let ([rst-dom
-             (cond
-               [(not rest-id) #f]
-               [(RestDots? rst) rst]
-               [(dotted? rest-id)
-                => (λ (b) (make-RestDots
-                           (extend-tvars (list b)
-                                         (get-type rest-id #:default Univ))
-                           b))]
-               [(type-annotation rest-id)
-                (match (get-type rest-id #:default Univ)
-                  [(? Type? t) (make-Rest (list t))]
-                  [(? Rest? rst) rst])]
-               [(not rst) (make-Rest (list -Bottom))]
-               [(Type? rst) (make-Rest (list rst))]
-               [(Rest? rst) rst]
-               [else (make-Rest (list Univ))])])
-        ;; >>>>>>>>>> BOOKMARK <<<<<<<<<
-        ;; so we should have defined rst-dom to be WHATEVER
-        ;; Rest arg (or RestDots) is right for this function,
-        ;; now we should convert that into the type of the actual
-        ;; identifier for the rest list that is used in the body
-        ;; (i.e. some subtype of (Listof Any) if it has a rest arg)
-        #;(cond
-          [(<= arg-len tys-len)
-           (define extra-types (drop arg-tys arg-len))
-           (make-Rest (for/list ([rt (in-list rest-types)])
-                        (apply Un rt extra-types)))]
-          [else (make-Rest rest-types)])
-        (error 'TODO)))
 
-    (tc-lambda-body arg-list arg-types
-                    #:rest-arg+type (and rest-type (cons rest-id rest-type))
-                    #:expected ret-ty
-                    body)))
+    ;; rest-body-type
+    ;; the type the rest id has in the body of the function
+    (define-values (rst-type rest-body-type)
+      (cond
+        [(not rest-id) (values #f #f)]
+        [(RestDots? rst)
+         (match-define (RestDots: dty dbound) rst)
+         (values rst (make-ListDots dty dbound))]
+        [(dotted? rest-id)
+         => (λ (dbound)
+              (define ty (extend-tvars (list dbound) (get-type rest-id #:default Univ)))
+              (values (make-RestDots ty dbound)
+                      (make-ListDots ty dbound)))]
+        [else
+         (define rest-types
+           (match (or (type-annotation rest-id) rst)
+             [#f (list -Bottom)]
+             [(? Type? t) (list t)]
+             [(Rest: rst-ts) rst-ts]
+             [_ (list Univ)]))
+         (values (make-Rest rest-types)
+                 (cond
+                   [(= arg-len tys-len) (make-CyclicListof rest-types)]
+                   ;; some of the args are _in_ the rst arg (at the front)
+                   [(<= arg-len tys-len)
+                    (define extra-types (drop arg-tys arg-len))
+                    (-Tuple* extra-types (make-CyclicListof rest-types))]
+                   ;; there are args whose type came from the rst
+                   [else
+                    (-Tuple* (take-right rest-types
+                                         (remainder (- arg-len tys-len)
+                                                    (length rest-types)))
+                             (make-CyclicListof rest-types))]))]))
+
+    (tc-lambda-body
+     arg-list
+     arg-types
+     #:rest-id+type+body-type (and rst-type (list rest-id rst-type rest-body-type))
+     #:expected ret-ty
+     body)))
 
 ;; typecheck a single lambda, with argument list and body
 ;; drest-ty and drest-bound are both false or not false
@@ -322,10 +322,17 @@
          (register-ignored! (car (syntax-e body)))
          x)]
       [else
+       (define rest-body-type
+         (match rest-type
+           [#f #f]
+           [(Rest: ts) (make-CyclicListof ts)]
+           [(RestDots: dty dbound) (make-ListDots dty dbound)]))
        (list
-        (tc-lambda-body arg-list (map (lambda (v) (or v Univ)) arg-types)
-                        #:rest-arg+type (and rest-type (cons rest-id rest-type))
-                        body))])]))
+        (tc-lambda-body
+         arg-list
+         (map (λ (v) (or v Univ)) arg-types)
+         #:rest-id+type+body-type (and rest-type (list rest-id rest-type rest-body-type))
+         body))])]))
 
 
 
