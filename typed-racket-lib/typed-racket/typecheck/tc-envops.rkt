@@ -5,7 +5,7 @@
          (for-syntax racket/base syntax/parse)
          (contract-req)
          (rep type-rep prop-rep object-rep rep-utils)
-         (utils tc-utils)
+         (utils tc-utils performance)
          racket/set
          (types tc-result resolve update prop-ops subtract)
          (env type-env-structs lexical-env mvar-env)
@@ -26,7 +26,9 @@
 
 ;; Returns #f if anything becomes (U)
 (define (env+ env ps)
-  (cond
+  (performance-region
+    ['env+]
+    (cond
     [(or (null? ps) (andmap TrueProp? ps)) env]
     [else
      (define-values (props atoms) (combine-props ps (env-props env)))
@@ -152,7 +154,7 @@
                       ;; something, we go back and logically add those extracted props to the environment
                       ;; in case it further refines our logical view of the program.
                       [else (env+ (env-replace-props Γ (append atoms (env-props Γ))) new)])]))]))]
-       [else #f])]))
+       [else #f])])))
 
 
 ;; run code in an extended env and with replaced props.

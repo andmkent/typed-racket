@@ -10,7 +10,7 @@
 (require "../utils/utils.rkt"
          (except-in
           (combine-in
-           (utils tc-utils)
+           (utils tc-utils performance)
            (rep free-variance type-rep prop-rep object-rep
                 values-rep rep-utils type-mask)
            (types utils abbrev numeric-tower subtype resolve
@@ -929,18 +929,20 @@
                     substitution/c
                     (cons/c substitution/c
                             (listof substitution/c))))
-     (define ctx (context null X Y))
-     (define expected-cset
-       (if expected
-           (cgen ctx R expected)
-           (empty-cset '() '())))
-     (and expected-cset
-          (let* ([cs (cgen/list ctx S T objs
-                                #:expected-cset expected-cset)]
-                 [cs* (% cset-meet cs expected-cset)])
-            (and cs* (cond
-                       [R (substs-gen cs* X Y R multiple-substitutions?)]
-                       [else #t])))))
+     (performance-region
+      ['infer]
+      (define ctx (context null X Y))
+      (define expected-cset
+        (if expected
+            (cgen ctx R expected)
+            (empty-cset '() '())))
+      (and expected-cset
+           (let* ([cs (cgen/list ctx S T objs
+                                 #:expected-cset expected-cset)]
+                  [cs* (% cset-meet cs expected-cset)])
+             (and cs* (cond
+                        [R (substs-gen cs* X Y R multiple-substitutions?)]
+                        [else #t]))))))
   ;(trace infer)
   infer)) ;to export a variable binding and not syntax
 

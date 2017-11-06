@@ -2,6 +2,7 @@
 
 (require "../utils/utils.rkt"
          racket/match racket/list
+         (utils performance)
          (except-in (types abbrev utils prop-ops)
                     -> ->* one-of/c)
          (rep type-rep prop-rep object-rep values-rep rep-utils)
@@ -19,11 +20,13 @@
 (define/cond-contract (abstract-results results arg-names #:rest-id [rest-id #f])
   ((tc-results/c (listof identifier?)) (#:rest-id (or/c #f identifier?))
    . ->* . SomeValues?)
-  (define abstracted (abstract-obj results arg-names #t))
-  (tc-results->values
-   (if rest-id
-       (erase-identifiers abstracted (list rest-id))
-       abstracted)))
+  (performance-region
+   ['abstract-results]
+   (define abstracted (abstract-obj results arg-names #t))
+   (tc-results->values
+    (if rest-id
+        (erase-identifiers abstracted (list rest-id))
+        abstracted))))
 
 (define (tc-results->values tc)
   (match (fix-results tc)
@@ -134,60 +137,64 @@
 
 
 (define (unconditional-prop res)
-  (match res
-    [(tc-any-results: p) p]
-    [(tc-results: tcrs _)
-     (apply
-      -and
-      (map (match-lambda
-             [(tc-result: _ (PropSet: p+ p-) _)
-              (-or p+ p-)])
-           tcrs))]))
+  (performance-region
+   ['unconditional-prop]
+   (match res
+     [(tc-any-results: p) p]
+     [(tc-results: tcrs _)
+      (apply
+       -and
+       (map (match-lambda
+              [(tc-result: _ (PropSet: p+ p-) _)
+               (-or p+ p-)])
+            tcrs))])))
 
 (define (merge-tc-results results [ignore-propositions? #f])
-  (define/match (merge-tc-result r1 r2)
-    [((tc-result: t1 (and ps1 (PropSet: p1+ p1-)) o1)
-      (tc-result: t2 (PropSet: p2+ p2-) o2))
-     (-tc-result (Un t1 t2)
-                 (if ignore-propositions?
-                     ps1
-                     (-PS (-or p1+ p2+) (-or p1- p2-)))
-                 (if (equal? o1 o2) o1 -empty-obj))])
+  (performance-region
+   ['merge-tc-results]
+   (define/match (merge-tc-result r1 r2)
+     [((tc-result: t1 (and ps1 (PropSet: p1+ p1-)) o1)
+       (tc-result: t2 (PropSet: p2+ p2-) o2))
+      (-tc-result (Un t1 t2)
+                  (if ignore-propositions?
+                      ps1
+                      (-PS (-or p1+ p2+) (-or p1- p2-)))
+                  (if (equal? o1 o2) o1 -empty-obj))])
 
-  (define/match (same-dty? r1 r2)
-    [(#f #f) #t]
-    [((RestDots: t1 dbound) (RestDots: t2 dbound)) #t]
-    [(_ _) #f])
-  (define/match (merge-dty r1 r2)
-    [(#f #f) #f]
-    [((RestDots: t1 dbound) (RestDots: t2 dbound))
-     (make-RestDots (Un t1 t2) dbound)])
+   (define/match (same-dty? r1 r2)
+     [(#f #f) #t]
+     [((RestDots: t1 dbound) (RestDots: t2 dbound)) #t]
+     [(_ _) #f])
+   (define/match (merge-dty r1 r2)
+     [(#f #f) #f]
+     [((RestDots: t1 dbound) (RestDots: t2 dbound))
+      (make-RestDots (Un t1 t2) dbound)])
 
 
-  (define/match (merge-two-results res1 res2)
-    [((tc-result1: (== -Bottom)) res2) res2]
-    [(res1 (tc-result1: (== -Bottom))) res1]
-    [((tc-any-results: f1) res2)
-     (-tc-any-results (-or f1 (unconditional-prop res2)))]
-    [(res1 (tc-any-results: f2))
-     (-tc-any-results (-or (unconditional-prop res1) f2))]
-    [((tc-results: results1 dty1)
-      (tc-results: results2 dty2))
-     ;; if we have the same number of values in both cases
-     (cond
-       [(and (= (length results1) (length results2))
-             (same-dty? dty1 dty2))
-        (-tc-results (map merge-tc-result results1 results2)
-                    (merge-dty dty1 dty2))]
-       ;; otherwise, error
-       [else
-        (tc-error/expr "Expected the same number of values, but got ~a"
-                       (if (< (length results1) (length results2))
-                           (format "~a and ~a." (length results1) (length results2))
-                           (format "~a and ~a." (length results2) (length results1))))])])
+   (define/match (merge-two-results res1 res2)
+     [((tc-result1: (== -Bottom)) res2) res2]
+     [(res1 (tc-result1: (== -Bottom))) res1]
+     [((tc-any-results: f1) res2)
+      (-tc-any-results (-or f1 (unconditional-prop res2)))]
+     [(res1 (tc-any-results: f2))
+      (-tc-any-results (-or (unconditional-prop res1) f2))]
+     [((tc-results: results1 dty1)
+       (tc-results: results2 dty2))
+      ;; if we have the same number of values in both cases
+      (cond
+        [(and (= (length results1) (length results2))
+              (same-dty? dty1 dty2))
+         (-tc-results (map merge-tc-result results1 results2)
+                      (merge-dty dty1 dty2))]
+        ;; otherwise, error
+        [else
+         (tc-error/expr "Expected the same number of values, but got ~a"
+                        (if (< (length results1) (length results2))
+                            (format "~a and ~a." (length results1) (length results2))
+                            (format "~a and ~a." (length results2) (length results1))))])])
 
-  (for/fold ([res (ret -Bottom)]) ([res2 (in-list results)])
-    (merge-two-results res res2)))
+   (for/fold ([res (ret -Bottom)]) ([res2 (in-list results)])
+     (merge-two-results res res2))))
 
 
 (define (erase-existentials rep)

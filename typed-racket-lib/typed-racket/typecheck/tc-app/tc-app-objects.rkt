@@ -9,7 +9,7 @@
          (typecheck signatures)
          (types base-abbrev resolve subtype type-table utils)
          (rep type-rep)
-         (utils tc-utils)
+         (utils tc-utils performance)
 
          (for-template racket/base)
          (for-label racket/base))
@@ -151,36 +151,38 @@
 ;; check-set-field : Syntax Syntax Syntax -> TCResult
 ;; type-check the `set-field!` operation on objects
 (define (check-set-field field obj val)
-  (define maybe-field-sym
-    (syntax-parse field [(quote f:id) (syntax-e #'f)] [_ #f]))
-  (unless maybe-field-sym
-    (tc-error/expr "expected a symbolic field name, but got ~a" field))
-  (define obj-type (tc-expr/t obj))
-  (define val-type (tc-expr/t val))
-  (define (check obj-type)
-    (match (resolve obj-type)
-      ;; FIXME: handle unions
-      [(and ty (Instance: (Class: _ _ (list fields ...) _ _ _)))
-       (cond [(assq maybe-field-sym fields) =>
-              (λ (field-entry)
-                (define field-type (cadr field-entry))
-                (unless (subtype val-type field-type)
-                  (tc-error/fields "type mismatch"
-                                   #:more "set-field! only allowed with compatible types"
-                                   "expected" field-type
-                                   "given" val-type
-                                   #:delayed? #t))
-                (ret -Void))]
-             [else
-              (tc-error/expr/fields "type mismatch"
-                                    #:more (~a "expected an object with field "
-                                               maybe-field-sym)
-                                    "given" ty)])]
-      [(Instance: (? resolvable? type))
-       (check (make-Instance (resolve type)))]
-      [type
-       (tc-error/expr/fields "type mismatch"
-                             #:more "expected an object value for set-field!"
-                             "given" type)]))
-  (check obj-type))
+  (performance-region
+   ['OO-check-set-field]
+   (define maybe-field-sym
+     (syntax-parse field [(quote f:id) (syntax-e #'f)] [_ #f]))
+   (unless maybe-field-sym
+     (tc-error/expr "expected a symbolic field name, but got ~a" field))
+   (define obj-type (tc-expr/t obj))
+   (define val-type (tc-expr/t val))
+   (define (check obj-type)
+     (match (resolve obj-type)
+       ;; FIXME: handle unions
+       [(and ty (Instance: (Class: _ _ (list fields ...) _ _ _)))
+        (cond [(assq maybe-field-sym fields) =>
+                                             (λ (field-entry)
+                                               (define field-type (cadr field-entry))
+                                               (unless (subtype val-type field-type)
+                                                 (tc-error/fields "type mismatch"
+                                                                  #:more "set-field! only allowed with compatible types"
+                                                                  "expected" field-type
+                                                                  "given" val-type
+                                                                  #:delayed? #t))
+                                               (ret -Void))]
+              [else
+               (tc-error/expr/fields "type mismatch"
+                                     #:more (~a "expected an object with field "
+                                                maybe-field-sym)
+                                     "given" ty)])]
+       [(Instance: (? resolvable? type))
+        (check (make-Instance (resolve type)))]
+       [type
+        (tc-error/expr/fields "type mismatch"
+                              #:more "expected an object value for set-field!"
+                              "given" type)]))
+   (check obj-type)))
 

@@ -1,6 +1,7 @@
 #lang racket/unit
 
 (require "../utils/utils.rkt"
+         (utils performance)
 	 (types abbrev subtype)
 	 racket/dict
      "fail.rkt" "signatures.rkt" "constraint-structs.rkt"
@@ -35,11 +36,13 @@
 ;; intersect the given types. produces a lower bound on both, but
 ;; perhaps not the GLB
 (define (meet S T)
-  (let ([s* (intersect S T)])
-    (if (and (subtype s* S)
-             (subtype s* T))
-        s*
-        (Un))))
+  (performance-region
+   ['infer-meet]
+   (let ([s* (intersect S T)])
+     (if (and (subtype s* S)
+              (subtype s* T))
+         s*
+         (Un)))))
 
 ;; join: Type Type -> Type
 ;; union the given types
@@ -52,11 +55,13 @@
 ;; uses the variable from `c1` (which must be the same as the one from
 ;; `c2`)
 (define (c-meet c1 c2 [var #f])
-  (match*/early (c1 c2)
-    [((struct c (S T)) (struct c (S* T*)))
-     (let ([S (join S S*)] [T (meet T T*)])
-       (and (subtype S T)
-            (make-c S T)))]))
+  (performance-region
+   ['infer-c-meet]
+   (match*/early (c1 c2)
+                 [((struct c (S T)) (struct c (S* T*)))
+                  (let ([S (join S S*)] [T (meet T T*)])
+                    (and (subtype S T)
+                         (make-c S T)))])))
 
 ;; compute the meet of two constraint sets
 ;; returns #f for failure

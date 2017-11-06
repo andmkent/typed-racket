@@ -6,7 +6,7 @@
          (rep type-rep prop-rep object-rep
               core-rep type-mask values-rep rep-utils
               free-variance rep-switch)
-         (utils tc-utils)
+         (utils tc-utils performance)
          (only-in (env type-env-structs)
                   with-lexical-env
                   with-naively-extended-lexical-env
@@ -56,7 +56,9 @@
 ;; if obj, then we're assuming obj is the subject
 ;; type type -> boolean
 (define (subtype t1 t2 [obj #f])
-  (and (subtype* (seen) t1 t2 obj) #t))
+  (performance-region
+   ['_ 'subtype]
+   (and (subtype* (seen) t1 t2 obj) #t)))
 
 
 ;; is v1 a subval of v2?
@@ -71,7 +73,10 @@
 
 ;; are all the s's subtypes of all the t's?
 ;; [type] [type] -> boolean
-(define (subtypes t1s t2s) (and (subtypes* (seen) t1s t2s) #t))
+(define (subtypes t1s t2s)
+  (performance-region
+   ['_ 'subtypes]
+   (and (subtypes* (seen) t1s t2s) #t)))
 
 (define (subresult r1 r2) (and (subresult* (seen) r1 r2) #t))
 

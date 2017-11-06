@@ -11,7 +11,7 @@
          (private-in syntax-properties parse-type)
          (rep type-rep prop-rep object-rep)
          (only-in (infer infer) intersect)
-         (utils tc-utils)
+         (utils tc-utils performance)
          (env lexical-env scoped-tvar-env)
          racket/list
          racket/private/class-internal
@@ -76,30 +76,32 @@
   (tc-expr/check form (ret expected)))
 
 (define (tc-expr/check form expected [existential? #f])
-  (parameterize ([current-orig-stx form])
-    ;; the argument must be syntax
-    (unless (syntax? form)
-      (int-err "bad form input to tc-expr: ~a" form))
-    (define result
-      ;; if there is an annotation, use that expected type for internal checking
-      (syntax-parse form
-        [exp:type-ascription^
-         (add-scoped-tvars #'exp (parse-literal-alls (attribute exp.value)))
-         (tc-expr/check/internal #'exp (parse-tc-results (attribute exp.value)))]
-        [_ (reduce-tc-results/subsumption
-            (tc-expr/check/internal form expected))]))
-    ;; if 'existential?' is true, then it means this expression should be
-    ;; given an existential identifier as an object if it has no object
-    (define adjusted-result
-      (cond
-        [existential?
-         (match result
-           [(tc-result1: t ps (not (? Object?)))
-            (ret t ps (-id-path (gen-existential-id)))]
-           [_ result])]
-        [else result]))
-    (add-typeof-expr form adjusted-result)
-    (cond-check-below adjusted-result expected)))
+  (performance-region
+   ['tc-expr/check]
+   (parameterize ([current-orig-stx form])
+     ;; the argument must be syntax
+     (unless (syntax? form)
+       (int-err "bad form input to tc-expr: ~a" form))
+     (define result
+       ;; if there is an annotation, use that expected type for internal checking
+       (syntax-parse form
+         [exp:type-ascription^
+          (add-scoped-tvars #'exp (parse-literal-alls (attribute exp.value)))
+          (tc-expr/check/internal #'exp (parse-tc-results (attribute exp.value)))]
+         [_ (reduce-tc-results/subsumption
+             (tc-expr/check/internal form expected))]))
+     ;; if 'existential?' is true, then it means this expression should be
+     ;; given an existential identifier as an object if it has no object
+     (define adjusted-result
+       (cond
+         [existential?
+          (match result
+            [(tc-result1: t ps (not (? Object?)))
+             (ret t ps (-id-path (gen-existential-id)))]
+            [_ result])]
+         [else result]))
+     (add-typeof-expr form adjusted-result)
+     (cond-check-below adjusted-result expected))))
 
 ;; typecheck and return a truth value indicating a typecheck failure (#f)
 ;; or success (any non-#f value)

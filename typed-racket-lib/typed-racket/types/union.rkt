@@ -1,6 +1,7 @@
 #lang racket/base
 
 (require "../utils/utils.rkt"
+         (utils performance)
          (rep type-rep rep-utils)
          (prefix-in c: (contract-req))
          (types subtype base-abbrev resolve current-seen)
@@ -16,10 +17,12 @@
 ;; can be useful in a few places, but avoid using
 ;; in hot code when Un (or similar) will suffice.
 (define (union t1 t2)
-  (cond
-    [(subtype t1 t2) t2]
-    [(subtype t2 t1) t1]
-    [else (Un t1 t2)]))
+  (performance-region
+   ['union]
+   (cond
+     [(subtype t1 t2) t2]
+     [(subtype t2 t1) t1]
+     [else (Un t1 t2)])))
 
 ;; t is a Type (not a union type)
 ;; b is a hset[Type] (non overlapping, non Union-types)
@@ -38,7 +41,9 @@
 ;; Not we only do it as we are generating contracts, since we
 ;; don't want to do redundant runtime checks, etc.
 (define (normalize-type t)
-  (match t
+  (performance-region
+   ['normalize-type]
+   (match t
     [(? BaseUnion?) t]
     [(Union-all-flat: ts) (apply Un (foldl merge '() ts))]
-    [_ (Rep-fmap t normalize-type)]))
+    [_ (Rep-fmap t normalize-type)])))

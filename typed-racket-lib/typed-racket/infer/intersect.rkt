@@ -1,6 +1,7 @@
 #lang racket/unit
 
 (require "../utils/utils.rkt"
+         (utils performance)
          (rep type-rep type-mask rep-utils)
          (types abbrev subtype resolve overlap)
          "signatures.rkt"
@@ -21,103 +22,105 @@
 ;; looking type out as a result (i.e. a literal intersection
 ;; (∩ ...) if we can't figure out exactly how the types relate)
 (define ((intersect-types additive?) t1 t2 seen obj)
-  (let intersect ([t1 t1] [t2 t2] [seen seen] [obj obj])
-    ;; t1   : Type?
-    ;; t2   : Type?
-    ;; seen : (listof (cons/c (cons/c Type? Type?) symbol?))
-    ;; A mapping tracking previously seen instances of potentially
-    ;; recursive types in order to prevent infinite looping
-    ;; and build a recursive type when appropriate. See the 'resolvable?'
-    ;; cases below.
-    (define (rec t1 t2 [obj -empty-obj]) (intersect t1 t2 seen obj))
-    (match* (t1 t2)
-      ;; quick overlap check
-      [(_ _) #:when (not (overlap? t1 t2)) -Bottom]
+  (performance-region
+   ['intersect]
+   (let intersect ([t1 t1] [t2 t2] [seen seen] [obj obj])
+     ;; t1   : Type?
+     ;; t2   : Type?
+     ;; seen : (listof (cons/c (cons/c Type? Type?) symbol?))
+     ;; A mapping tracking previously seen instances of potentially
+     ;; recursive types in order to prevent infinite looping
+     ;; and build a recursive type when appropriate. See the 'resolvable?'
+     ;; cases below.
+     (define (rec t1 t2 [obj -empty-obj]) (intersect t1 t2 seen obj))
+     (match* (t1 t2)
+       ;; quick overlap check
+       [(_ _) #:when (not (overlap? t1 t2)) -Bottom]
       
-      ;; already a subtype
-      [(_ _) #:when (subtype t1 t2 obj) t1]
-      [(_ _) #:when (subtype t2 t1 obj) t2]
+       ;; already a subtype
+       [(_ _) #:when (subtype t1 t2 obj) t1]
+       [(_ _) #:when (subtype t2 t1 obj) t2]
 
      
-      ;; polymorphic intersect
-      [(t1 (Poly: vars body))
-       #:when (infer vars null (list t1) (list body) #f)
-       t1]
-      [((Poly: vars body) t2)
-       #:when (infer vars null (list t2) (list body) #f)
-       t2]
+       ;; polymorphic intersect
+       [(t1 (Poly: vars body))
+        #:when (infer vars null (list t1) (list body) #f)
+        t1]
+       [((Poly: vars body) t2)
+        #:when (infer vars null (list t2) (list body) #f)
+        t2]
      
-      ;; structural recursion on types
-      [((Pair: a1 d1) (Pair: a2 d2))
-       (rebuild -pair (rec a1 a2 (-car-of obj)) (rec d1 d2 (-cdr-of obj)))]
-      ;; FIXME: support structural updating for structs when structs are updated to
-      ;; contain not only *if* they are polymorphic, but *which* fields are too
-      ;;[((Struct: _ _ _ _ _ _)
-      ;; (Struct: _ _ _ _ _ _))]
-      [((Syntax: t1*) (Syntax: t2*))
-       (rebuild -Syntax (rec t1* t2*))]
-      [((Promise: t1*) (Promise: t2*))
-       (rebuild -Promise (rec t1* t2*))]
+       ;; structural recursion on types
+       [((Pair: a1 d1) (Pair: a2 d2))
+        (rebuild -pair (rec a1 a2 (-car-of obj)) (rec d1 d2 (-cdr-of obj)))]
+       ;; FIXME: support structural updating for structs when structs are updated to
+       ;; contain not only *if* they are polymorphic, but *which* fields are too
+       ;;[((Struct: _ _ _ _ _ _)
+       ;; (Struct: _ _ _ _ _ _))]
+       [((Syntax: t1*) (Syntax: t2*))
+        (rebuild -Syntax (rec t1* t2*))]
+       [((Promise: t1*) (Promise: t2*))
+        (rebuild -Promise (rec t1* t2*))]
 
-      [((Union: base1 t1s) t2)
-       (match t2
-         ;; let's be consistent in slamming together unions
-         ;; (i.e. if we don't do this dual traversal, the order the
-         ;; unions are passed to 'intersect' can produces different
-         ;; (albeit equivalent modulo subtyping, we believe) answers)
-         [(Union-all: t2s)
-          (let ([t1s (if (Bottom? base1) t1s (cons base1 t1s))])
-            (apply Un (for*/list ([t1 (in-list t1s)]
-                                  [t2 (in-list t2s)]
-                                  [t* (in-value (rec t1 t2 obj))]
-                                  #:unless (Bottom? t*))
-                        t*)))]
-         [_ (Union-fmap (λ (t1) (rec t1 t2 obj)) base1 t1s)])]
-      [(t1 (Union: base2 t2s)) (Union-fmap (λ (t2) (rec t1 t2 obj)) base2 t2s)]
+       [((Union: base1 t1s) t2)
+        (match t2
+          ;; let's be consistent in slamming together unions
+          ;; (i.e. if we don't do this dual traversal, the order the
+          ;; unions are passed to 'intersect' can produces different
+          ;; (albeit equivalent modulo subtyping, we believe) answers)
+          [(Union-all: t2s)
+           (let ([t1s (if (Bottom? base1) t1s (cons base1 t1s))])
+             (apply Un (for*/list ([t1 (in-list t1s)]
+                                   [t2 (in-list t2s)]
+                                   [t* (in-value (rec t1 t2 obj))]
+                                   #:unless (Bottom? t*))
+                         t*)))]
+          [_ (Union-fmap (λ (t1) (rec t1 t2 obj)) base1 t1s)])]
+       [(t1 (Union: base2 t2s)) (Union-fmap (λ (t2) (rec t1 t2 obj)) base2 t2s)]
 
-      [((Intersection: t1s raw-prop) t2)
-       (-refine (apply -unsafe-intersect (map (λ (t1) (rec t1 t2 obj)) t1s))
-                raw-prop)]
-      [(t1 (Intersection: t2s raw-prop))
-       (-refine (apply -unsafe-intersect (map (λ (t2) (rec t1 t2 obj)) t2s))
-                raw-prop)]
+       [((Intersection: t1s raw-prop) t2)
+        (-refine (apply -unsafe-intersect (map (λ (t1) (rec t1 t2 obj)) t1s))
+                 raw-prop)]
+       [(t1 (Intersection: t2s raw-prop))
+        (-refine (apply -unsafe-intersect (map (λ (t2) (rec t1 t2 obj)) t2s))
+                 raw-prop)]
 
-      [(t1 t2) #:when (or (resolvable? t1) (resolvable? t2))
-               (resolvable-intersect t1 t2 seen obj additive?)]
+       [(t1 t2) #:when (or (resolvable? t1) (resolvable? t2))
+                (resolvable-intersect t1 t2 seen obj additive?)]
 
-      ;; Base Unions
-      [((BaseUnion: bbits1 nbits1)
-        (BaseUnion: bbits2 nbits2))
-       (make-BaseUnion (bbits-intersect bbits1 bbits2)
-                       (nbits-intersect nbits1 nbits2))]
-      [((BaseUnion: bbits nbits)
-        (Base-bits: numeric? bits))
-       (cond [numeric? (if (nbits-overlap? nbits bits)
-                           t2
-                           -Bottom)]
-             [else (if (bbits-overlap? bbits bits)
-                       t2
-                       -Bottom)])]
-      [((Base-bits: numeric? bits)
-        (BaseUnion: bbits nbits))
-       (cond [numeric? (if (nbits-overlap? nbits bits)
-                           t1
-                           -Bottom)]
-             [else (if (bbits-overlap? bbits bits)
-                       t1
-                       -Bottom)])]
-      [((BaseUnion-bases: bases1) t2)
-       (apply Un (for/list ([b (in-list bases1)])
-                   (rec b t2 obj)))]
-      [(t1 (BaseUnion-bases: bases2))
-       (apply Un (for/list ([b (in-list bases2)])
-                   (rec t1 b obj)))]
+       ;; Base Unions
+       [((BaseUnion: bbits1 nbits1)
+         (BaseUnion: bbits2 nbits2))
+        (make-BaseUnion (bbits-intersect bbits1 bbits2)
+                        (nbits-intersect nbits1 nbits2))]
+       [((BaseUnion: bbits nbits)
+         (Base-bits: numeric? bits))
+        (cond [numeric? (if (nbits-overlap? nbits bits)
+                            t2
+                            -Bottom)]
+              [else (if (bbits-overlap? bbits bits)
+                        t2
+                        -Bottom)])]
+       [((Base-bits: numeric? bits)
+         (BaseUnion: bbits nbits))
+        (cond [numeric? (if (nbits-overlap? nbits bits)
+                            t1
+                            -Bottom)]
+              [else (if (bbits-overlap? bbits bits)
+                        t1
+                        -Bottom)])]
+       [((BaseUnion-bases: bases1) t2)
+        (apply Un (for/list ([b (in-list bases1)])
+                    (rec b t2 obj)))]
+       [(t1 (BaseUnion-bases: bases2))
+        (apply Un (for/list ([b (in-list bases2)])
+                    (rec t1 b obj)))]
 
-      ;; t2 and t1 have a complex relationship, so we build an intersection
-      ;; if additive, otherwise t1 remains unchanged
-      [(t1 t2) (if additive?
-                   (-unsafe-intersect t1 t2)
-                   t1)])))
+       ;; t2 and t1 have a complex relationship, so we build an intersection
+       ;; if additive, otherwise t1 remains unchanged
+       [(t1 t2) (if additive?
+                    (-unsafe-intersect t1 t2)
+                    t1)]))))
 
 
 

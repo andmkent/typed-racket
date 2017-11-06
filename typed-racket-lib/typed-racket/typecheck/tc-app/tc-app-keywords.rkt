@@ -8,7 +8,7 @@
          (typecheck signatures tc-app-helper tc-funapp tc-metafunctions)
          (types abbrev utils substitute subtype type-table)
          (rep type-rep)
-         (utils tc-utils)
+         (utils tc-utils performance)
          (r:infer infer)
          (for-label racket/base)
          ;; adjusted -1 since it's provided for-syntax
@@ -62,44 +62,46 @@
        (tc-error/expr "Cannot apply expression of type ~a, since it is not a function type" t)])))
 
 (define (tc-keywords/internal arity kws kw-args error?)
-  (match arity
-    [(Arrow: dom (not (? RestDots?)) ktys rng)
-     ;; assumes that everything is in sorted order
-     (let loop ([actual-kws kws]
-                [actuals (stx-map tc-expr/t kw-args)]
-                [formals ktys])
-       (match* (actual-kws formals)
-         [('() '())
-          (void)]
-         [(_ '())
-          (if error?
-              (tc-error/delayed "Unexpected keyword argument ~a" (car actual-kws))
-              #f)]
-         [('() (cons fst rst))
-          (match fst
-            [(Keyword: k _ #t)
-             (if error?
-                 (tc-error/delayed "Missing keyword argument ~a" k)
-                 #f)]
-            [_ (loop actual-kws actuals rst)])]
-         [((cons k kws-rest) (cons (Keyword: k* t req?) form-rest))
-          (cond [(eq? k k*) ;; we have a match
-                 (if (subtype (car actuals) t)
-                     ;; success
-                     (loop kws-rest (cdr actuals) form-rest)
-                     ;; failure
-                     (and error?
-                          (tc-error/delayed
-                           "Wrong function argument type, expected ~a, got ~a for keyword argument ~a"
-                           t (car actuals) k)
-                          (loop kws-rest (cdr actuals) form-rest)))]
-                [req? ;; this keyword argument was required
-                 (if error?
-                     (begin (tc-error/delayed "Missing keyword argument ~a" k*)
-                            (loop kws-rest (cdr actuals) form-rest))
-                     #f)]
-                [else ;; otherwise, ignore this formal param, and continue
-                 (loop actual-kws actuals form-rest)])]))]))
+  (performance-region
+   ['tc-keywords/internal]
+   (match arity
+     [(Arrow: dom (not (? RestDots?)) ktys rng)
+      ;; assumes that everything is in sorted order
+      (let loop ([actual-kws kws]
+                 [actuals (stx-map tc-expr/t kw-args)]
+                 [formals ktys])
+        (match* (actual-kws formals)
+          [('() '())
+           (void)]
+          [(_ '())
+           (if error?
+               (tc-error/delayed "Unexpected keyword argument ~a" (car actual-kws))
+               #f)]
+          [('() (cons fst rst))
+           (match fst
+             [(Keyword: k _ #t)
+              (if error?
+                  (tc-error/delayed "Missing keyword argument ~a" k)
+                  #f)]
+             [_ (loop actual-kws actuals rst)])]
+          [((cons k kws-rest) (cons (Keyword: k* t req?) form-rest))
+           (cond [(eq? k k*) ;; we have a match
+                  (if (subtype (car actuals) t)
+                      ;; success
+                      (loop kws-rest (cdr actuals) form-rest)
+                      ;; failure
+                      (and error?
+                           (tc-error/delayed
+                            "Wrong function argument type, expected ~a, got ~a for keyword argument ~a"
+                            t (car actuals) k)
+                           (loop kws-rest (cdr actuals) form-rest)))]
+                 [req? ;; this keyword argument was required
+                  (if error?
+                      (begin (tc-error/delayed "Missing keyword argument ~a" k*)
+                             (loop kws-rest (cdr actuals) form-rest))
+                      #f)]
+                 [else ;; otherwise, ignore this formal param, and continue
+                  (loop actual-kws actuals form-rest)])]))])))
 
 (define (tc-keywords form arrows kws kw-args pos-args expected)
   (match arrows

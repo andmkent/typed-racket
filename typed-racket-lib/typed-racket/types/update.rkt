@@ -5,7 +5,7 @@
          (contract-req)
          (infer-in infer)
          (rep core-rep type-rep prop-rep object-rep values-rep rep-utils)
-         (utils tc-utils)
+         (utils tc-utils performance)
          (types resolve subtype subtract)
          (rename-in (types abbrev)
                     [-> -->]
@@ -22,7 +22,9 @@
 ;;   in *syntactic order* (e.g. (car (cdr x)) -> '(car cdr))  
 (define/cond-contract (update t new-t pos? path-elems)
   (Type? Type? boolean? (listof PathElem?) . -> . Type?)
-  ;; update's inner recursive loop
+  (performance-region
+   ['update]
+   ;; update's inner recursive loop
   ;; puts path in *accessed* order
   ;; (i.e. (car (cdr x)) --> (list cdr car))
   (let update
@@ -92,4 +94,4 @@
       ;; path is empty (base case)
       [_ (cond
            [pos? (intersect (resolve t) new-t)]
-           [else (subtract (resolve t) new-t)])])))
+           [else (subtract (resolve t) new-t)])]))))

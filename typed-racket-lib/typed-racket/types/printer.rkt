@@ -7,6 +7,7 @@
          racket/pretty
          racket/list
          racket/set
+         "../utils/performance.rkt"
          (path-up "rep/type-rep.rkt" "rep/prop-rep.rkt" "rep/object-rep.rkt"
                   "rep/core-rep.rkt" "rep/values-rep.rkt" "rep/fme-utils.rkt"
                   "rep/rep-utils.rkt" "rep/free-ids.rkt"
@@ -246,55 +247,57 @@
 ;; We do set coverage, with the elements of the union being what we want to
 ;; cover, and all the names types we know about being the sets.
 (define (cover-union t elems ignored-names)
-  (define valid-names
-    ;; We keep only unions, and only those that are subtypes of t.
-    ;; It's no use attempting to cover t with things that go outside of t.
-    (filter (lambda (p)
-              (match p
-                [(cons name (and t* (or (? Union?) (? BaseUnion?))))
-                 (and (not (member name ignored-names))
-                      (subtype t* t))]
-                [_ #f]))
-            (force (current-type-names))))
-  ;; names and the sets themselves (not the union types)
-  ;; note that racket/set supports lists with equal?
-  (define candidates
-    (map (match-lambda [(cons name (Union-all-flat: elts)) (cons name elts)]
-                       [(cons name (BaseUnion-bases: elts)) (cons name elts)])
-         valid-names))
-  ;; some types in the union may not be coverable by the candidates
-  ;; (e.g. type variables, etc.)
-  (define-values (uncoverable coverable)
-    (values (apply set-subtract elems (map cdr candidates))
-            (set-intersect elems (apply set-union null (map cdr candidates)))))
-  ;; set cover, greedy algorithm, ~lg n approximation
-  (let loop ([to-cover   coverable]
-             [candidates candidates]
-             [coverage   '()])
-    (cond [(null? to-cover) ; done
-           (define coverage-names (map car coverage))
-           ;; to allow :type to cue the user on unexpanded aliases
-           ;; only union types can flow here, and any of those could be expanded
-           (set-box! (current-print-unexpanded)
-                     (append coverage-names (unbox (current-print-unexpanded))))
-           ;; reverse here to retain the old ordering from when srfi/1 was
-           ;; used to process the list sets
-           (values coverage-names (reverse uncoverable))] ; we want the names
-          [else
-           ;; pick the candidate that covers the most uncovered types
-           (define (covers-how-many? c)
-             (length (set-intersect (cdr c) to-cover)))
-           (define-values (next _)
-             (for/fold ([next      (car candidates)]
-                        [max-cover (covers-how-many? (car candidates))])
-                 ([c (in-list candidates)])
-               (let ([how-many? (covers-how-many? c)])
-                 (if (> how-many? max-cover)
-                     (values c how-many?)
-                     (values next max-cover)))))
-           (loop (set-subtract to-cover (cdr next))
-                 (remove next candidates)
-                 (cons next coverage))])))
+  (performance-region
+   ['printer-conver-union]
+   (define valid-names
+     ;; We keep only unions, and only those that are subtypes of t.
+     ;; It's no use attempting to cover t with things that go outside of t.
+     (filter (lambda (p)
+               (match p
+                 [(cons name (and t* (or (? Union?) (? BaseUnion?))))
+                  (and (not (member name ignored-names))
+                       (subtype t* t))]
+                 [_ #f]))
+             (force (current-type-names))))
+   ;; names and the sets themselves (not the union types)
+   ;; note that racket/set supports lists with equal?
+   (define candidates
+     (map (match-lambda [(cons name (Union-all-flat: elts)) (cons name elts)]
+                        [(cons name (BaseUnion-bases: elts)) (cons name elts)])
+          valid-names))
+   ;; some types in the union may not be coverable by the candidates
+   ;; (e.g. type variables, etc.)
+   (define-values (uncoverable coverable)
+     (values (apply set-subtract elems (map cdr candidates))
+             (set-intersect elems (apply set-union null (map cdr candidates)))))
+   ;; set cover, greedy algorithm, ~lg n approximation
+   (let loop ([to-cover   coverable]
+              [candidates candidates]
+              [coverage   '()])
+     (cond [(null? to-cover) ; done
+            (define coverage-names (map car coverage))
+            ;; to allow :type to cue the user on unexpanded aliases
+            ;; only union types can flow here, and any of those could be expanded
+            (set-box! (current-print-unexpanded)
+                      (append coverage-names (unbox (current-print-unexpanded))))
+            ;; reverse here to retain the old ordering from when srfi/1 was
+            ;; used to process the list sets
+            (values coverage-names (reverse uncoverable))] ; we want the names
+           [else
+            ;; pick the candidate that covers the most uncovered types
+            (define (covers-how-many? c)
+              (length (set-intersect (cdr c) to-cover)))
+            (define-values (next _)
+              (for/fold ([next      (car candidates)]
+                         [max-cover (covers-how-many? (car candidates))])
+                        ([c (in-list candidates)])
+                (let ([how-many? (covers-how-many? c)])
+                  (if (> how-many? max-cover)
+                      (values c how-many?)
+                      (values next max-cover)))))
+            (loop (set-subtract to-cover (cdr next))
+                  (remove next candidates)
+                  (cons next coverage))]))))
 
 ;; arr->sexp : arr -> s-expression
 ;; Convert an arr (see type-rep.rkt) to its printable form
