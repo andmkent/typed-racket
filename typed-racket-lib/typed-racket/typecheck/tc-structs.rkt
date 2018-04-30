@@ -196,13 +196,13 @@
                       (if mutable
                           (->* (list poly-base) t)
                           (->acc (list poly-base) t (list path))))])
-          (add-struct-fn! g path #f)
+          (add-struct-accessor-fn! g path mutable)
           (make-def-binding g func)))
       (if mutable
           (for/list ([s (in-list (struct-names-setters names))]
                      [t (in-list self-fields)]
                      [i (in-naturals parent-count)])
-            (add-struct-fn! s (make-StructPE poly-base i) #t)
+            (add-struct-mutator-fn! s (make-StructPE poly-base i))
             (make-def-binding s (poly-wrapper (->* (list poly-base t) -Void))))
           null))))
 

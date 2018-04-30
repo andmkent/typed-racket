@@ -6,7 +6,8 @@
          (rep core-rep type-rep object-rep values-rep free-ids rep-utils)
          (types abbrev utils prop-ops resolve
                 classes prefab signatures
-                subtype path-type numeric-tower)
+                subtype path-type numeric-tower
+                struct-table)
          (only-in (infer-in infer) intersect)
          (utils tc-utils stxclass-util literal-syntax-class)
          syntax/stx (prefix-in c: (contract-req))
@@ -449,7 +450,31 @@
                             (not (subtype obj-ty -VectorTop)))
            (format "vector-length expects a vector, but got ~a for ~a"
                    obj-ty obj)
-           #:attr val (-vec-len-of (attribute o.val))))
+           #:attr val (-vec-len-of (attribute o.val)))
+  (pattern (struct-field:id ~! o:symbolic-object-w/o-lexp)
+           #:do [(define checking? (check-type-invariants-while-parsing?))
+                 (define obj (attribute o.val))
+                 (define obj-ty (lookup-obj-type/lexical obj))
+                 (define fld-pe (struct-accessor? #'struct-field))]
+           #:fail-when (and checking?
+                            (not fld-pe))
+           (format "expected a struct field accessor, got ~a"
+                   (syntax-e #'struct-field))
+           #:do [(define-values (struct-type idx)
+                   (match fld-pe
+                     [(StructPE: struct-type idx)
+                      (values struct-type idx)]
+                     [_ (values #f #f)]))]
+           #:fail-when (and checking? (or (not struct-type)
+                                          (not (immutable-struct-field-accessor?
+                                                #'struct-field))))
+           (format "~a does not correspond to an immutable struct field accessor"
+                   (syntax-e #'struct-field))
+           #:fail-when (and checking?
+                            (not (subtype obj-ty struct-type)))
+           (format "~a expects a ~a, but got ~a for ~a"
+                   (syntax-e #'struct-field) struct-type obj-ty obj)
+           #:attr val (-path-elem-of fld-pe obj)))
 
 (define-syntax-class linear-expression
   #:description "linear expression"

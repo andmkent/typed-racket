@@ -456,10 +456,15 @@
   (make-init-code
    struct-fn-table-map
    (λ (id v)
-     (match-define (list pe mut?) v)
-     #`(add-struct-fn! (quote-syntax #,id)
-                       #,(path-elem->sexp pe)
-                       #,mut?))))
+     (match-define (list pe mutator? mutable?) v)
+     (cond
+       [mutator?
+        #`(add-struct-mutator-fn! (quote-syntax #,id)
+                                  #,(path-elem->sexp pe))]
+       [else
+        #`(add-struct-accessor-fn! (quote-syntax #,id)
+                                   #,(path-elem->sexp pe)
+                                   mutable?)]))))
 
 ;; -> (Listof Syntax)
 ;; Construct syntax that does type environment serialization
