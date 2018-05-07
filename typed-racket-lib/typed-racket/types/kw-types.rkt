@@ -29,6 +29,16 @@
     (sort keywords (λ (kw1 kw2) (keyword<? (Keyword-kw kw1)
                                            (Keyword-kw kw2)))))
 
+  (define pos-opt-arg-types
+    (append (for/list ([t (in-list optional-arg-types)]
+                       [supplied? (in-list pos-opts-supplied?)])
+              (if supplied?
+                  t
+                  (Un t -Unsafe-Undefined)))
+            (let ([num-opts (length optional-arg-types)])
+              (make-missing-opt-args (- (length pos-opts-supplied?) num-opts)
+                                     (list-tail pos-opts-supplied? num-opts)))))
+
   (make-Fun
    (cond
      [(not split?)
@@ -42,11 +52,7 @@
                                       t
                                       (Un t -Unsafe-Undefined))]))
           mandatory-arg-types
-          (for/list ([t (in-list optional-arg-types)]
-                     [supplied? (in-list pos-opts-supplied?)])
-            (if supplied?
-                t
-                (Un t -Unsafe-Undefined)))
+          pos-opt-arg-types
           rst-type)))
 
       (list (-Arrow ts rng))]
@@ -66,14 +72,7 @@
                  (cons t pos) ; keyword always supplied by expansion, so no unsafe-undefined check
                  (cons (Un t -Unsafe-Undefined) pos))])))
 
-      (define updated-optional-arg-types
-        (for/list ([t (in-list optional-arg-types)]
-                   [supplied? (in-list pos-opts-supplied?)])
-          (if supplied?
-              t
-              (Un t -Unsafe-Undefined))))
-
-      (list (-Arrow (append kw-args mandatory-arg-types updated-optional-arg-types rst-type)
+      (list (-Arrow (append kw-args mandatory-arg-types pos-opt-arg-types rst-type)
                     rng))])))
 
 ;; This is used to fix the props of keyword types.
@@ -246,7 +245,8 @@
             (define opt-types-count (length opt-types))
             (make-Fun
              (for/list ([to-take (in-range (add1 opt-types-count))])
-               (-Arrow (append mand-args (take opt-types to-take))
+               (-Arrow (append mand-args
+                               (take opt-types to-take))
                        (erase-props/Values rng)
                        #:kws actual-kws
                        #:rest (if (= to-take opt-types-count) rest-type #f))))]
@@ -319,7 +319,8 @@
   (match arr
     [(Arrow: args #f '() result)
      (define num-args (length args))
-     (and (= num-args (+ required-pos optional-pos))
+     (and (>= num-args required-pos)
+          (<= num-args (+ required-pos optional-pos))
           (let* ([required-args (take args required-pos)]
                  [opt-args (for/list ([arg (in-list (drop args required-pos))]
                                       [supplied? (in-list optional-supplied?)])
@@ -327,9 +328,20 @@
                                  arg
                                  (Un -Unsafe-Undefined arg)))])
             (-Arrow (append required-args
-                            opt-args)
+                            opt-args
+                            (make-missing-opt-args (- (+ required-pos optional-pos) num-args)
+                                                   (list-tail optional-supplied? (- num-args required-pos))))
                     result)))]
     [_ #f]))
+
+(define (make-missing-opt-args num-missing-opt-args supplied?s)
+  (for/list ([i (in-range num-missing-opt-args)]
+             [supplied? (in-list supplied?s)])
+    (if supplied?
+        ;; body will get the right type from other `if` branch:
+        (Un)
+        ;; body can deal with an unsafe-undefined argument:
+        -Unsafe-Undefined)))
 
 (define (opt-convert ft required-pos optional-pos optional-supplied?)
   (let loop ([ft ft])
@@ -376,9 +388,7 @@
       ;; if min and max both have rest args, then there cannot
       ;; have been any optional arguments
       [(arg:id ... . rst:id) 0]))
-  ;; counted twice since optionals expand to two arguments
-  (define argc (+ raw-argc opt-argc))
-  (define mand-argc (- argc (* 2 opt-argc)))
+  (define mand-argc (- raw-argc opt-argc))
   (match ft
     [(Fun: arrs)
      (cond [(= 1 (length arrs))
