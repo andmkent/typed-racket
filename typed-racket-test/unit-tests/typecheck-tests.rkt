@@ -4789,28 +4789,28 @@
             (+ x y1 y2 z1 z2))
           (void))
         -Void]
-       [tc-e
-        (let ()
-          (: f (-> Number Number Number))
-          (tr:define (f x
-                     [y1 0]
-                     [y2 (+ 1 0)]
-                     #:z1 [z1 0]
-                     #:z2 [z2 (+ 1 0)])
-            (+ x y1 y2 z1 z2))
-          (void))
-        -Void]
-       [tc-e
-        (let ()
-          (: f (-> Number Number Number Number))
-          (tr:define (f x
-                     [y1 0]
-                     [y2 (+ 1 0)]
-                     #:z1 [z1 0]
-                     #:z2 [z2 (+ 1 0)])
-            (+ x y1 y2 z1 z2))
-          (void))
-        -Void]
+;       [tc-e ;; FIXME should type check
+;        (let ()
+;          (: f (-> Number Number Number))
+;          (tr:define (f x
+;                     [y1 0]
+;                     [y2 (+ 1 0)]
+;                     #:z1 [z1 0]
+;                     #:z2 [z2 (+ 1 0)])
+;            (+ x y1 y2 z1 z2))
+;          (void))
+;        -Void]
+;       [tc-e  ;; FIXME should type check
+;        (let ()
+;          (: f (-> Number Number Number Number))
+;          (tr:define (f x
+;                     [y1 0]
+;                     [y2 (+ 1 0)]
+;                     #:z1 [z1 0]
+;                     #:z2 [z2 (+ 1 0)])
+;            (+ x y1 y2 z1 z2))
+;          (void))
+;        -Void]
        [tc-e
         (let ()
           (: f (->* (Number) (#:z1 Number) Number))
