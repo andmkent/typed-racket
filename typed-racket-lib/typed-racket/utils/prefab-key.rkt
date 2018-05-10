@@ -1,22 +1,25 @@
 #lang racket/base
 
-;; Utilities for dealing with prefab struct types
+;; Utilities for dealing with prefab struct keys
 
 (require "../utils/utils.rkt"
          (contract-req)
          racket/list
          racket/match)
 
-(provide/cond-contract [normalize-prefab-key
-                        (-> prefab-key? integer? prefab-key?)]
-                       [prefab-key->field-count
-                        (-> prefab-key? integer?)]
-                       [abbreviate-prefab-key
-                        (-> prefab-key? prefab-key?)]
-                       [prefab-key-subtype?
-                        (-> prefab-key? prefab-key? any)]
-                       [prefab-key->field-mutability
-                        (-> prefab-key? (listof boolean?))])
+(provide/cond-contract
+ [normalize-prefab-key
+  (-> prefab-key? integer? prefab-key?)]
+ [prefab-key->field-count
+  (-> prefab-key? integer?)]
+ [abbreviate-prefab-key
+  (-> prefab-key? prefab-key?)]
+ [prefab-key-subtype?
+  (-> prefab-key? prefab-key? any)]
+ [prefab-key->field-mutability
+  (-> prefab-key? (listof boolean?))]
+ [prefab-key/mutable-fields?
+  (-> prefab-key? boolean?)])
 
 ;; Convert a prefab key to its expanded version
 (define (normalize-prefab-key key field-length)
@@ -123,3 +126,14 @@
            (append (loop parents)
                    (for/list ([idx (in-range len)])
                      (and (member idx mut-list) #t)))])))
+
+;; Returns a boolean indicating if any field described
+;; by this key is mutable.
+;; Precondition: the key is fully expanded
+(define (prefab-key/mutable-fields? key)
+  (let loop ([key key])
+    (cond [(null? key) #f]
+          [else
+           (match-define (list sym len auto mut parents ...) key)
+           (or (not (eqv? 0 (vector-length mut)))
+               (loop parents))])))

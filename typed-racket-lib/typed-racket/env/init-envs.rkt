@@ -257,6 +257,7 @@
     [(Prefab: key flds)
      `(make-Prefab (quote ,key)
                    (list ,@(map type->sexp flds)))]
+    [(PrefabTop: key) `(make-PrefabTop (quote ,key))]
     [(App: rator rands)
      `(make-App ,(type->sexp rator)
                 (list ,@(map type->sexp rands)))]
@@ -386,7 +387,9 @@
     [(In-Predefined-Table: id) id]
     ;; CarPE, CdrPE, SyntaxPE, ForcePE, FieldPE are in the table
     [(StructPE: ty idx)
-     `(make-StructPE ,(type->sexp ty) ,idx)]))
+     `(make-StructPE ,(type->sexp ty) ,idx)]
+    [(PrefabPE: key idx)
+     `(make-PrefabPE (quote ,key) ,idx)]))
 
 (define (bound-in-this-module id)
   (let ([binding (identifier-binding id)])
@@ -456,10 +459,17 @@
   (make-init-code
    struct-fn-table-map
    (λ (id v)
-     (match-define (list pe mut?) v)
-     #`(add-struct-fn! (quote-syntax #,id)
-                       #,(path-elem->sexp pe)
-                       #,mut?))))
+     (match-define (list pe mutator? mutable?) v)
+     (cond
+       [mutator?
+        #`(add-struct-mutator-fn!
+           (quote-syntax #,id)
+           #,(path-elem->sexp pe))]
+       [else
+        #`(add-struct-accessor-fn!
+           (quote-syntax #,id)
+           #,(path-elem->sexp pe)
+           #,mutable?)]))))
 
 ;; -> (Listof Syntax)
 ;; Construct syntax that does type environment serialization

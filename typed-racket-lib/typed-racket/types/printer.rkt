@@ -16,7 +16,7 @@
                   "types/utils.rkt" "types/abbrev.rkt"
                   "types/union.rkt" "types/numeric-tower.rkt"
                   "types/resolve.rkt"
-                  "types/prefab.rkt"
+                  "utils/prefab-key.rkt"
                   "utils/utils.rkt"
                   "utils/tc-utils.rkt")
          (for-syntax racket/base syntax/parse))
@@ -179,6 +179,7 @@
     [(CdrPE:) 'cdr]
     [(ForcePE:) 'force]
     [(StructPE: t i) `(,(type->sexp t)-,i)]
+    [(PrefabPE: key i) `(,key ,i)]
     [(VecLenPE:) 'vector-length]
     [(SyntaxPE:) 'syntax]
     [else `(Invalid Path-Element: ,(struct->vector pathelem))]))
@@ -559,6 +560,9 @@
     [(Prefab: key field-types)
      `(Prefab ,(abbreviate-prefab-key key)
               ,@(map t->s field-types))]
+    [(PrefabTop: key)
+     `(PrefabTop ,(abbreviate-prefab-key key)
+                 ,(prefab-key->field-count key))]
     [(BoxTop:) 'BoxTop]
     [(Weak-BoxTop:) 'Weak-BoxTop]
     [(ChannelTop:) 'ChannelTop]

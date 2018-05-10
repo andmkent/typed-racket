@@ -49,6 +49,8 @@
   [#:frees (f) (f t)]
   [#:fmap (f) (make-StructPE (f t) idx)]
   [#:for-each (f) (f t)])
+(def-path-elem PrefabPE ([key prefab-key?] [idx natural-number/c])
+  #:base)
 
 (def-path-elem VecLenPE () [#:singleton -vec-len])
 
@@ -66,9 +68,9 @@
 (define/provide (-force-of o) (-path-elem-of -force o))
 (define/provide (-vec-len-of o) (-path-elem-of -vec-len o))
 (define/provide (-struct-idx-of t idx o)
-  (if (Empty? o) ;; lets not make the pe if we don't need to
-      o
-      (-path-elem-of (make-StructPE t idx) o)))
+  (-path-elem-of (make-StructPE t idx) o))
+(define/provide (-prefab-idx-of key idx o)
+  (-path-elem-of (make-PrefabPE key idx) o))
 
 
 ;; e.g. (car (cdr x)) == (make-Path (list -car -cdr) x)

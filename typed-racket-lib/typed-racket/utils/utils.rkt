@@ -31,6 +31,7 @@ at least theoretically.
  list-ref/default
  match*/no-order
  bind
+ gen-pretty-sym
  genid
  gen-pretty-id
  gen-existential-id
@@ -441,6 +442,7 @@ at least theoretically.
 (module local-ids racket
   (provide local-tr-identifier?
            genid
+           gen-pretty-sym
            gen-pretty-id
            gen-existential-id
            mark-id-as-normalized
@@ -469,16 +471,16 @@ at least theoretically.
                                     "l" "m" "n" "o" "p" "q" "r" "s" "t" "u" "v"  "w"))
   ;; this is just a silly helper function that gives us a letter from
   ;; the latin alphabet in a cyclic manner
-  (define next-letter
+  (define gen-pretty-sym
     (let ([i 0])
       (λ ()
         (define letter (string->uninterned-symbol (vector-ref letters i)))
         (set! i (modulo (add1 i) (vector-length letters)))
         letter)))
   ;; generates a fresh identifier w/ a "pretty" printable representation
-  (define (gen-pretty-id [sym (next-letter)])
+  (define (gen-pretty-id [sym (gen-pretty-sym)])
     (mark-id-as-normalized (datum->syntax #'loc sym)))
-  (define (gen-existential-id [sym (next-letter)])
+  (define (gen-existential-id [sym (gen-pretty-sym)])
     (mark-id-as-existential (genid sym)))
   ;; allows us to recognize and distinguish gensym'd identifiers
   ;; from ones that came from the program we're typechecking

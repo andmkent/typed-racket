@@ -3,11 +3,10 @@
 (require "../utils/utils.rkt"
          racket/match
          (typecheck signatures check-below)
-         (types abbrev numeric-tower resolve subtype generalize
-                prefab)
+         (types abbrev numeric-tower resolve subtype generalize)
          (rep type-rep)
          (only-in (infer infer) intersect)
-         (utils stxclass-util)
+         (utils stxclass-util prefab-key)
          syntax/parse
          racket/extflonum)
 

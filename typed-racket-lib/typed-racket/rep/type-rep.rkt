@@ -7,7 +7,7 @@
          (for-syntax "../utils/utils.rkt"))
 
 ;; TODO use contract-req
-(require (utils tc-utils)
+(require (utils tc-utils prefab-key)
          "rep-utils.rkt"
          "core-rep.rkt"
          "object-rep.rkt"
@@ -643,16 +643,6 @@
          [pred-id (normalize-id pred-id)])
      (make-Struct name parent flds proc poly? pred-id))])
 
-;; Represents prefab structs
-;; key  : prefab key encoding mutability, auto-fields, etc.
-;; flds : the types of all of the prefab fields
-(def-type Prefab ([key prefab-key?]
-                  [flds (listof Type?)])
-  [#:frees (f) (combine-frees (map f flds))]
-  [#:fmap (f) (make-Prefab key (map f flds))]
-  [#:for-each (f) (for-each f flds)]
-  [#:mask mask:prefab])
-
 (def-type StructTypeTop ()
   [#:mask mask:struct-type]
   [#:singleton -StructTypeTop])
@@ -669,6 +659,34 @@
   [#:fmap (f) (make-StructTop (f name))]
   [#:for-each (f) (f name)]
   [#:mask (mask-union mask:struct mask:procedure)])
+
+
+;; Represents prefab structs
+;; key  : prefab key encoding mutability, auto-fields, etc.
+;;        NOTE: this key should be "fully expanded"--see
+;;              utils/prefab-key.rkt for details.
+;; flds : the types of all of the prefab fields
+(def-type Prefab ([key prefab-key?]
+                  [flds (listof Type?)])
+  [#:frees (f) (combine-frees (map f flds))]
+  [#:fmap (f) (make-Prefab key (map f flds))]
+  [#:for-each (f) (for-each f flds)]
+  [#:mask mask:prefab])
+
+;; key  : prefab key encoding mutability, auto-fields, etc.
+;;        NOTE: this key should be "fully expanded"--see
+;;              utils/prefab-key.rkt for details.
+(def-type PrefabTop ([key prefab-key?])
+  #:base
+  [#:mask mask:prefab]
+  [#:custom-constructor
+   (cond
+     [(prefab-key/mutable-fields? key)
+      (make-PrefabTop key)]
+     [else
+      (make-Prefab key (build-list (prefab-key->field-count key)
+                                   (λ (_) Univ)))])])
+
 
 
 ;;************************************************************

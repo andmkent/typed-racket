@@ -8,8 +8,9 @@
          racket/list
          racket/match
          (prefix-in c: (contract-req))
+         (utils prefab-key)
          (rep rep-utils type-rep prop-rep object-rep values-rep)
-         (types numeric-tower prefab)
+         (types numeric-tower)
          ;; Using this form so all-from-out works
          "base-abbrev.rkt" "match-expanders.rkt"
 
@@ -43,6 +44,8 @@
 (define -inst make-Instance)
 (define (-prefab key . types)
   (make-Prefab (normalize-prefab-key key (length types)) types))
+(define (-prefab-top key field-count)
+  (make-Prefab (normalize-prefab-key key field-count)))
 (define -unit make-Unit)
 (define -signature make-Signature)
 
