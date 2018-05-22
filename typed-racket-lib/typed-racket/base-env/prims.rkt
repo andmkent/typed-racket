@@ -43,6 +43,7 @@ the typed racket language.
          define-typed-struct
          define-typed-struct/exec
          ann inst row-inst
+         shed
          :
          (rename-out [define-typed-struct define-struct:]
                      [define-typed-struct define-struct]

@@ -11,7 +11,7 @@
          (private-in syntax-properties parse-type)
          (rep type-rep prop-rep object-rep)
          (only-in (infer infer) intersect)
-         (utils tc-utils)
+         (utils tc-utils shed-utils)
          (env lexical-env scoped-tvar-env)
          racket/list
          racket/private/class-internal
@@ -83,9 +83,51 @@
     (define result
       ;; if there is an annotation, use that expected type for internal checking
       (syntax-parse form
+        #:literal-sets (kernel-literals tc-expr-literals)
         [exp:type-ascription^
          (add-scoped-tvars #'exp (parse-literal-alls (attribute exp.value)))
          (tc-expr/check/internal #'exp (parse-tc-results (attribute exp.value)))]
+        [(~and exp:shed-contents^ (if (~and tst-stx (quote #f)) shed-body err-expr))
+         (test-position-add-false #'tst-stx)
+         (register-ignored! #'err-expr)
+         (cond
+           [expected
+            ;; (attribute exp.value) ;; currently unused shed info
+            (match (attribute exp.value)
+              [(shed-info orig _)
+               (define errors (tc-expr/check/error-list #'shed-body expected))
+               (cond
+                 [(null? errors)
+                  (define e (exn:fail:syntax "shed contents have expected type"
+                                             (continuation-marks #f)
+                                             (list orig)))
+                  ((error-display-handler) (exn-message e) e)
+                  (reduce-tc-results/subsumption expected)]
+                 [else
+                  (define e (exn:fail:syntax "shed contents do not have expected type"
+                                             (continuation-marks #f)
+                                             (list orig)))
+                  ((error-display-handler) (exn-message e) e)
+                  (for ([err (in-list errors)])
+                    ((error-display-handler) (exn-message err) err))
+                  (reduce-tc-results/subsumption expected)])])]
+           [else
+            (tc-error "shed used without expected type. please add a type annotation")])]
+        ;; shed w/ no body
+        [err-expr:shed-contents^
+         (register-ignored! #'err-expr)
+         (cond
+           [expected
+            (match (attribute err-expr.value)
+              [(shed-info orig body)
+               (define e (exn:fail:syntax "shed has no contents"
+                                          (continuation-marks #f)
+                                          (list orig)))
+               ((error-display-handler) (exn-message e) e)
+               (reduce-tc-results/subsumption expected)])]
+           [else
+            (tc-error "shed used without expected type. please add a type annotation")])]
+        
         [_ (reduce-tc-results/subsumption
             (tc-expr/check/internal form expected))]))
     (add-typeof-expr form result)
@@ -102,6 +144,23 @@
           (let ([result (tc-expr/check form expected)])
             (and (not (current-type-error?)) result)))
         (λ () (restore-errors!))))))
+
+
+;; tc-expr/check/error-list
+;; returns list of errors that occurred while typechecking form,
+;; empty list means no type check errors
+(define (tc-expr/check/error-list form expected)
+  (define errors '())
+  (parameterize ([current-type-error? #f])
+    (with-handlers ([exn:fail:syntax? (λ (err) (set! errors (cons err errors)))])
+      (dynamic-wind
+        (λ () (save-errors!))
+        (λ ()
+          (let ([result (tc-expr/check form expected)])
+            (and (not (current-type-error?)) result)))
+        (λ () (begin (set! errors (append (current-delayed-errors) errors))
+                     (restore-errors!))))))
+  (map tc-err->exn errors))
 
 (define (tc-expr/check/t? form expected)
   (match (tc-expr/check? form expected)

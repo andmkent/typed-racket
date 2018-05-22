@@ -6,10 +6,12 @@
 ;; have expensive runtime dependencies.
 
 (require (for-syntax syntax/parse/pre "../private/syntax-properties.rkt"
-                     racket/base)
+                     racket/base
+                     racket/match
+                     "../utils/shed-utils.rkt")
          "colon.rkt")
 
-(provide (for-syntax add-ann) ann inst row-inst)
+(provide (for-syntax add-ann) ann inst row-inst shed)
 
 (define-syntax (ann stx)
   (syntax-parse stx #:literals (:)
@@ -36,3 +38,38 @@
     [(_ arg row)
      (with-syntax ([expr (row-inst-property #'#%expression #'row)])
        (syntax/loc #'arg (expr arg)))]))
+
+
+(define-syntax (shed stx)
+  (syntax-parse stx #:literals (:)
+    [(_)
+     (build-shed stx #f)]
+    ;; TODO keyword arg parsing for shed
+    [(_ body-exprs ...)
+     (build-shed stx #'(body-exprs ...))]))
+
+
+;; TODO look at how ':' and 'struct' are handled by TR
+(define-for-syntax (build-shed stx body-exprs)
+  (define bodies
+    (match (and body-exprs (syntax->datum body-exprs))
+      [#f "no contents"]
+      [(list e) e]
+      [es es]))
+  (define expansion
+    (cond
+      [body-exprs
+       (shed-contents-property
+        (quasisyntax/loc stx
+          (if #f
+              (begin #,@body-exprs)
+              (error 'shed "contents ~a"
+                     (quote #,bodies))))
+        (shed-info stx #t))]
+      [else
+       (shed-contents-property
+        (quasisyntax/loc stx (error 'shed "no contents"))
+        (shed-info stx #t))]))
+  (syntax-property expansion
+                   'goal
+                   bodies))

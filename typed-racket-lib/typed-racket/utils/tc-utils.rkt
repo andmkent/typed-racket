@@ -42,6 +42,9 @@ don't depend on any other portion of the system
          id-from?
          id-from
 
+         current-delayed-errors
+         tc-err->exn
+
          (all-from-out "disappeared-use.rkt"))
 
 ;; a parameter representing the original location of the syntax being
@@ -103,8 +106,15 @@ don't depend on any other portion of the system
       (raise-syntax-error (string->symbol "Type Checker") msg #f #f stxs)))
 
 (define delayed-errors null)
+(define (current-delayed-errors) delayed-errors)
 
 (define-struct err (msg stx) #:prefab)
+
+(define (tc-err->exn e)
+  (eprintf "LOC  ~a\n\n" (err-stx e))
+  (exn:fail:syntax (err-msg e)
+                   (continuation-marks #f)
+                   (err-stx e)))
 
 (define-values (save-errors! restore-errors!)
   (let ([v (box #f)])
