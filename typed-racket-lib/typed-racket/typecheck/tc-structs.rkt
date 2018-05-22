@@ -151,14 +151,10 @@
   (c:-> Prefab? struct-names? struct-desc? (c:or/c #f struct-info?) (c:listof binding?))
   (define key (Prefab-key pty))
   (match-define
-    (struct-desc parent-fields self-fields
-                 constructor-tvars
-                 self-mutable parent-mutable _)
+    (struct-desc (app length parent-count) (app length self-count)
+                 _ self-mutable parent-mutable _)
     desc)
   (define any-mutable (or self-mutable parent-mutable))
-  (define all-fields (append parent-fields self-fields))
-  (define self-count (length self-fields))
-  (define parent-count (length parent-fields))
   (define field-count (+ self-count parent-count))
   (define field-univs (build-list field-count (λ (_) Univ)))
   (define field-tvar-syms
@@ -177,8 +173,7 @@
                        (make-pred-ty prefab-top-type))
      (append
       (for/list ([acc-id (in-list (struct-names-getters names))]
-                 [t (in-list self-fields)]
-                 [idx (in-naturals parent-count)])
+                 [idx (in-range parent-count (+ parent-count self-count))])
         (let* ([path (make-PrefabPE key idx)]
                [fld-sym (list-ref field-tvar-syms idx)]
                [fld-t (list-ref field-tvar-Fs idx)]
@@ -204,8 +199,7 @@
           (make-def-binding acc-id func-t)))
       (if self-mutable
           (for/list ([s (in-list (struct-names-setters names))]
-                     [t (in-list self-fields)]
-                     [idx (in-naturals parent-count)])
+                     [idx (in-range parent-count (+ parent-count self-count))])
             (let ([fld-t (list-ref field-tvar-Fs idx)])
               (add-struct-mutator-fn! s prefab-top-type idx)
               (make-def-binding s (make-Poly
@@ -213,30 +207,20 @@
                                    (->* (list raw-poly-prefab fld-t) -Void)))))
           null))))
 
-  ;; the base-type, with free type variables
-  ;; NOTE: This type is only used for the constructor
-  ;;       of a prefab---other operators are entirely polymorphic
-  (define name-type
-    (make-Name (struct-names-type-name names)
-               (length constructor-tvars)
-               #t))
-  (define poly-base
-    (if (null? constructor-tvars)
-        name-type
-        (make-App name-type (map make-F constructor-tvars))))
+  
   (define extra-constructor (struct-names-extra-constructor names))
 
   (define constructor-binding
     (make-def-binding (struct-names-constructor names)
-                      (make-Poly constructor-tvars
-                                 (->* all-fields poly-base))))
+                      (make-Poly field-tvar-syms
+                                 (->* field-tvar-Fs raw-poly-prefab))))
   (define constructor-bindings
     (cons constructor-binding
           (if extra-constructor
               (list (make-def-binding
                      extra-constructor
-                     (make-Poly constructor-tvars
-                                (->* all-fields poly-base))))
+                     (make-Poly field-tvar-syms
+                                (->* field-tvar-Fs raw-poly-prefab))))
               null)))
 
   (for ([b (in-list (append constructor-bindings bindings))])
