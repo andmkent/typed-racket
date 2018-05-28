@@ -576,6 +576,38 @@
                                          (obj size)))
              ps
              orig-obj)]
+       ;; modulo
+       [(_ (~literal modulo)
+           (~var e1 (t/obj -Int))
+           (~var e2 (t/obj -Nat)))
+        (ret (-refine/fresh x ret-t (-lt (-lexp x) (obj e2)))
+             ps
+             orig-obj)]
+       ;; random (1 arg)
+       [(_ (~literal random) (~var e1 (t/obj -Nat)))
+        (ret (-refine/fresh x ret-t (-lt (-lexp x) (obj e1)))
+             ps
+             orig-obj)]
+       ;; random (2 arg)
+       [(_ (~literal random)
+           (~var e1 (t/obj -Int))
+           (~var e2 (t/obj -Int)))
+        (ret (-refine/fresh x ret-t (-and (-leq (obj e1) (-lexp x))
+                                          (-lt (-lexp x) (obj e2))))
+             ps
+             orig-obj)]
+       ;; add1
+       [(_ (~literal add1) (~var e1 (t/obj -Int)))
+        (define l (-lexp-add1 (obj e1)))
+        (ret (-refine/fresh x ret-t (-eq (-lexp x) l))
+             ps
+             l)]
+       ;; sub1
+       [(_ (~literal sub1) (~var e1 (t/obj -Int)))
+        (define l (-lexp-sub1 (obj e1)))
+        (ret (-refine/fresh x ret-t (-eq (-lexp x) l))
+             ps
+             l)]
        [_ result])]
     [_ result]))
 

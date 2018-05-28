@@ -97,6 +97,7 @@
             (tc/funapp #'f #'args f-ty (map tc-dep-fun-arg args*) expected))]
          [(Fun: (app matching-arities
                      (list (Arrow: doms rsts _ _) ..1)))
+          (define refinements-on? (with-refinements?))
           ;; if for a particular argument, all of the domain types
           ;; agree for each arrow type in the case->, then we use
           ;; that type to check the argument expression against
@@ -108,8 +109,14 @@
                 [(for/and ([dom (in-list (cdr doms))]
                            [rst (in-list (cdr rsts))])
                    (equal? dom-ty (dom+rst-ref dom rst arg-idx)))
-                 (single-value arg-stx (ret dom-ty))]
+                 (if refinements-on?
+                     (tc-dep-fun-arg arg-stx (ret dom-ty))
+                     (single-value arg-stx (ret dom-ty)))]
+                [refinements-on? (tc-dep-fun-arg arg-stx)]
                 [else (single-value arg-stx)])))
           (tc/funapp #'f #'args f-ty arg-types expected)]
-         [_ (tc/funapp #'f #'args f-ty (map single-value args*) expected)]))]))
+         [_ (tc/funapp #'f #'args f-ty (if (with-refinements?)
+                                           (map tc-dep-fun-arg args*)
+                                           (map single-value args*))
+                       expected)]))]))
 
