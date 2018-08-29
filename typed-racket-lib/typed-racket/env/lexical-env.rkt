@@ -1,4 +1,4 @@
-#lang racket/base
+#lang racket/base 
 
 ;; this environment maps *lexical* variables to types
 ;; it also contains the proposition environment
@@ -11,7 +11,9 @@
          (for-syntax syntax/parse racket/base)
          (contract-req)
          racket/match
+         
          (env type-env-structs global-env)
+         
          (types numeric-tower path-type)
          (rep object-rep)
          (utils tc-utils)
@@ -21,11 +23,14 @@
 
 (require-for-cond-contract (rep object-rep core-rep))
 
+
 (provide lexical-env
          add-props-to-current-lexical!
          with-lexical-env
          with-extended-lexical-env
-         with-naively-extended-lexical-env)
+         with-naively-extended-lexical-env
+         lookup-obj-type/lexical)
+
 (provide/cond-contract
  [lookup-id-type/lexical ((identifier?) (env? #:fail (or/c #f Type? (-> any/c (or/c Type? #f))))
                                         . ->* .

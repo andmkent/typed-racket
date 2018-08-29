@@ -1,17 +1,20 @@
-#lang racket/base
+ #lang racket/base
 
 (require racket/match
+         racket/format
+         racket/list
          syntax/id-table
          (except-in "../utils/utils.rkt" env)
          (contract-req)
          ;; dict ops only used for convenient printing
          ;; (e.g. performance is irrelevant)
          (only-in racket/dict dict->list dict-map)
-         (rep core-rep object-rep)
+         (rep core-rep prop-rep object-rep)
          (types numeric-tower)
-         (for-syntax racket/base syntax/parse))
+         (for-syntax racket/base syntax/parse)
+         )
 
-(require-for-cond-contract (rep type-rep prop-rep))
+(require-for-cond-contract (rep type-rep))
 
 ;; types is a free-id-table of identifiers to types
 ;; props is a list of known propositions
@@ -42,14 +45,31 @@
   [env-lookup-id (env? identifier? (identifier? . -> . any) . -> . any)]
   [env-lookup-obj (env? Object? (Object? . -> . any) . -> . any)]
   [env-props (env? . -> . (listof Prop?))]
+  [env-types (env? . -> . immutable-free-id-table?)]
+  [env-obj-types (env? . -> . hash?)]
+  [env-id-types (-> env? hash?)]
+  [env-id-aliases (-> env? hash?)]
+  [env-aliases (-> env? immutable-free-id-table?)]
   [env-replace-props (env? (listof Prop?) . -> . env?)]
   [empty-env env?]
   [env-lookup-alias (env? identifier? (identifier? . -> . (or/c OptObject? #f)) . -> . (or/c OptObject? #f))])
 
 
+;;; ================================================
 (provide lexical-env
          with-lexical-env
-         with-naively-extended-lexical-env)
+         with-naively-extended-lexical-env
+         )
+
+(define (free-id-table->obj-table fid-table)
+  (for/hash ([(id val) (in-free-id-table fid-table)])
+    (values (-id-path id) val)))
+
+(define (env-id-types e)
+  (free-id-table->obj-table (env-types e)))
+
+(define (env-id-aliases e)
+  (free-id-table->obj-table (env-aliases e)))
 
 (define empty-env
   (env

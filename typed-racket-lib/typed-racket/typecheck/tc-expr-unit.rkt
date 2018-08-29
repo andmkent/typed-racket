@@ -1,7 +1,7 @@
-#lang racket/unit
+#lang racket/unit 
 
-
-(require (rename-in "../utils/utils.rkt" [private private-in])
+(require
+  (rename-in "../utils/utils.rkt" [private private-in])
          racket/match (prefix-in - (contract-req))
          "signatures.rkt"
          "check-below.rkt" "../types/kw-types.rkt"
@@ -12,7 +12,10 @@
          (rep type-rep prop-rep object-rep)
          (only-in (infer infer) intersect)
          (utils tc-utils identifier)
-         (env lexical-env scoped-tvar-env)
+         
+         (env lexical-env scoped-tvar-env env-print)
+        
+         racket/format
          racket/list
          racket/private/class-internal
          syntax/parse
@@ -79,7 +82,7 @@
 ;; expected : what is the expected tc-result (can be #f)
 ;; existential? : do we want to create an existential
 ;;   identifier for this expression if it does not
-;;   have a non-trivual object? This is useful when
+;;   have a non-trivial object? This is useful when
 ;;   the type of other expressions can depend on
 ;;   the specific type of this term.
 (define (tc-expr/check form expected [existential? #f])
@@ -125,6 +128,7 @@
     [(tc-result1: t) t]
     [#f #f]))
 
+
 (define (explicit-fail stx msg var)
   (cond [(and (identifier? var) (lookup-id-type/lexical var #:fail (λ _ #f)))
          =>
@@ -133,6 +137,37 @@
                           (string-append (syntax-e msg) "; missing coverage of ~a")
                           t))]
          [else (tc-error/expr #:stx stx (syntax-e msg))]))
+
+;;(require (for-syntax syntax/parse))
+;;; ======================================
+;(define-syntax (TODO* stx)
+;  (syntax-case stx ()
+;    [(_ msg)
+;     ;; Attach a notice that it is a TODO to be filled out
+;     (syntax-property (syntax/loc stx
+;                        (error msg))
+;                      'todo
+;                      (vector "--------------------\n"
+;                              (syntax->datum #'msg)))]))
+
+
+
+(define (format-expected exp)
+  (match exp
+    [(tc-result1: T) (~a "1 value with type " T)]
+    [(tc-results: tcrs #f) (~a (length tcrs) " values with types" tcrs)]
+    ;; TODO simplify this case
+    [(tc-results: tcrs (RestDots: dty _))
+     (~a (length tcrs) " " (if (= (length tcrs) 1) "value" "values")
+         ;; added tcrs and dty to the end of this call to ~a
+         " and `" dty " ...'" tcrs dty)]
+    [(tc-any-results: T) (~a "Expected type: Could be any amount of values, each with type " T)]
+    [#f "Hmm not sure what to expect"]
+    ))
+
+
+
+;; ======================================
 
 ;; tc-expr/check/internal : syntax maybe[tc-results] -> tc-results
 (define/cond-contract (tc-expr/check/internal form expected)
@@ -143,6 +178,19 @@
       (int-err "bad form input to tc-expr: ~a" form))
     (syntax-parse form
       #:literal-sets (kernel-literals tc-expr-literals)
+      
+      ;; a TODO* is found
+      [e #:when (syntax-property form 'todo)
+         (define this-todo (syntax-property form 'todo))
+         (define curr-info (vector-ref this-todo 0))
+         (define final-expected (and expected (fix-results expected)))
+         (define new-info (string-append (env->string (lexical-env))
+                                         curr-info
+                                         (format-expected final-expected)))
+         (vector-set! this-todo 0 new-info)
+         
+         (or final-expected (tc-error/expr "a TODO must have an expected type"))]
+      
       ;; a TR-annotated class
       [stx:tr:class^
        (check-class form expected)]
@@ -351,6 +399,8 @@
        (tc/letrec-values #'((name ...) ...) #'(expr ...) #'body expected)]
       ;; other
       [_ (int-err "cannot typecheck unknown form : ~s" (syntax->datum form))])))
+
+
 
 ;; type check form in the current type environment
 ;; if there is a type error in form, or if it has the wrong annotation, error
