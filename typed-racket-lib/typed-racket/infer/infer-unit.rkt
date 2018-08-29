@@ -818,8 +818,13 @@
              ;; for each element of t-arr, we need to get at least one element of s-arr that works
              (let ([results (for*/list ([s-arr (in-list s-arr)]
                                         [v (in-value (cgen/arrow context s-arr t-arr))]
+                                        [_ (in-value (eprintf "considering arrows:\n  a1: ~a\n  a2: ~a\n result: ~a\n"
+                                                              t-arr
+                                                              s-arr
+                                                              (and v (stream->list (cset-maps v)))))]
                                         #:when v)
                               v)])
+               (eprintf "results: ~a\n\n" results)
                ;; ensure that something produces a constraint set
                (and (not (null? results))
                     (cset-join results)))))]
@@ -976,7 +981,8 @@
 
 ;; like infer, but T-var is the vararg type:
 (define (infer/vararg X Y S T T-var R [expected #f]
-                      #:objs [objs '()])
+                      #:objs [objs '()]
+                      #:multiple? [multiple-substitutions? #f])
   (and ((length S) . >= . (length T))
        (let* ([fewer-ts (- (length S) (length T))]
               [new-T (match T-var
@@ -986,13 +992,14 @@
                         (append T (repeat-list rst-ts
                                                (quotient fewer-ts (length rst-ts))))]
                        [_ T])])
-         (infer X Y S new-T R expected #:objs objs))))
+         (infer X Y S new-T R expected #:objs objs #:multiple? multiple-substitutions?))))
 
 ;; like infer, but dotted-var is the bound on the ...
 ;; and T-dotted is the repeated type
 (define (infer/dots X dotted-var S T T-dotted R must-vars
                     #:expected [expected #f]
-                    #:objs [objs (map (λ (_) #f) S)])
+                    #:objs [objs (map (λ (_) #f) S)]
+                    #:multiple? [multiple-substitutions? #f])
   (early-return
    (define-values (short-S rest-S) (split-at S (length T)))
    (define-values (short-objs rest-objs) (split-at objs (length T)))
@@ -1019,7 +1026,7 @@
    #:return-unless cs #f
    (define m (cset-meet cs expected-cset))
    #:return-unless m #f
-   (substs-gen m X (list dotted-var) R #f)))
+   (substs-gen m X (list dotted-var) R multiple-substitutions?)))
 
 
 ;(trace substs-gen)

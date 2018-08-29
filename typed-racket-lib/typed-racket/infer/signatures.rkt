@@ -55,7 +55,9 @@
                                    (or/c #f Values/c ValuesDots?))
                                   ;; [optional] expected type
                                   ((or/c #f Values/c AnyValues? ValuesDots?)
-                                   #:objs (listof OptObject?))
+                                   #:objs (listof OptObject?)
+                                   ;; optional multiple substitutions?
+                                   #:multiple? boolean?)
                                   . ->* . any)]
    [cond-contracted infer/dots (((listof symbol?)
                                  symbol?
@@ -65,5 +67,6 @@
                                  (or/c Values/c ValuesDots?)
                                  (listof symbol?))
                                 (#:expected (or/c #f Values/c AnyValues? ValuesDots?)
-                                 #:objs (listof OptObject?))
+                                 #:objs (listof OptObject?)
+                                 #:multiple? boolean?)
                                 . ->* . any)]))

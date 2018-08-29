@@ -207,28 +207,41 @@
        ;; check there are no RestDots
        #:when (not (for/or ([a (in-list arrows)])
                      (RestDots? (Arrow-rst a))))
-       (for/first-valid-inference
-           #:in-arrs [a (in-list arrows)]
-         #:arr-match (Arrow: dom rst kws rng)
-         #:function-syntax f-stx
-         #:args-syntax args-stx
-         ;; only try inference if the argument lengths are appropriate
-         ;; and there's no mandatory kw
-         #:infer-when
-         (and (not (ormap Keyword-required? kws))
-              (Arrow-includes-arity? dom rst argtys))
-         ;; Only try to infer the free vars of the rng (which includes the vars
-         ;; in props/objects).
-         #:maybe-inferred-substitution
-         (let ([rng (subst-dom-objs argtys argobjs rng)])
-           (extend-tvars vars
-                         (infer/vararg vars null argtys dom rst rng
-                                       (and expected
-                                            (tc-results->values expected))
-                                       #:objs argobjs)))
-         #:function-type f-type
-         #:args-results args-res
-         #:expected expected)]
+       (define results
+         (for*/fold ([results '()])
+                    ([a (in-list arrows)]
+                     [subs (in-value
+                            (match a
+                              [(Arrow: dom rst kws rng)
+                               (and (not (ormap Keyword-required? kws))
+                                    (Arrow-includes-arity? dom rst argtys)
+                                    (let ([rng (subst-dom-objs argtys argobjs rng)])
+                                      (extend-tvars vars
+                                                    (infer/vararg vars null argtys dom rst rng
+                                                                  (and expected
+                                                                       (tc-results->values expected))
+                                                                  #:objs argobjs
+                                                                  #:multiple? #t))))]))]
+                     #:when subs)
+           (for/fold ([results results])
+                     ([sub (in-list subs)])
+             (cons (tc/funapp1 f-stx args-stx (subst-all sub a)
+                               args-res expected #:check #f #:tooltip? #f)
+                   results))))
+       (eprintf "\n overall results: ~a\n" results)
+       (cond
+         [(null? results)
+          (poly-fail f-stx args-stx f-type args-res
+                     #:name (and (identifier? f-stx) f-stx)
+                     #:expected expected)]
+         #;[else (intersect-tc-results results)]
+         [else
+          (define result (intersect-tc-results results))
+          (cond
+            [expected
+             (check-below result expected)]
+            [else
+             result])])]
       ;; polymorphic dependent function
       [(Poly: vars (DepFun: raw-dom raw-pre raw-rng))
        (parameterize ([with-refinements? #t])
