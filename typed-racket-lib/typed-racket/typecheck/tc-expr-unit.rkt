@@ -165,7 +165,7 @@
     [#f "Hmm not sure what to expect"]
     ))
 
-
+(define-logger online-check-syntax)
 
 ;; ======================================
 
@@ -180,14 +180,23 @@
       #:literal-sets (kernel-literals tc-expr-literals)
       
       ;; a TODO* is found
-      [e #:when (syntax-property form 'todo)
-         (define this-todo (syntax-property form 'todo))
-         (define curr-info (vector-ref this-todo 0))
+      [e #:when (syntax-property form 'pre-todo)
+         
+         ;(define this-todo (syntax-property form 'todo))
+         ;(define curr-info (vector-ref this-todo 0))
          (define final-expected (and expected (fix-results expected)))
          (define new-info (string-append (env->string (lexical-env))
-                                         curr-info
+                                         "-----------------\n" ;curr-info
                                          (format-expected final-expected)))
-         (vector-set! this-todo 0 new-info)
+         ;(vector-set! this-todo 0 new-info)
+         
+         (log-message online-check-syntax-logger
+                      'info
+                      'online-check-syntax
+                      "ignored message"
+                      (list (syntax-property form 'todo (vector
+                                                         new-info
+                                                         (syntax-property form 'pre-todo)))))
          
          (or final-expected (tc-error/expr "a TODO must have an expected type"))]
       
